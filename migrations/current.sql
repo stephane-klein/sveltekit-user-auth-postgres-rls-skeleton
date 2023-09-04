@@ -17,7 +17,6 @@ CREATE TABLE auth.users (
     last_name              VARCHAR(150) DEFAULT NULL,
     email                  VARCHAR(360) DEFAULT NULL,
     password               VARCHAR(255) DEFAULT NULL,
-    is_staff               BOOLEAN DEFAULT false,
     is_active              BOOLEAN DEFAULT false,
     last_login             TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     date_joined            TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -28,7 +27,6 @@ CREATE INDEX users_username_index    ON auth.users (username);
 CREATE INDEX users_first_name_index  ON auth.users (first_name);
 CREATE INDEX users_last_name_index   ON auth.users (last_name);
 CREATE INDEX users_email_index       ON auth.users (email);
-CREATE INDEX users_is_staff_index    ON auth.users (is_staff);
 CREATE INDEX users_is_active_index   ON auth.users (is_active);
 CREATE INDEX users_last_login_index  ON auth.users (last_login);
 CREATE INDEX users_date_joined_index ON auth.users (date_joined);
@@ -37,33 +35,33 @@ CREATE INDEX users_updated_at_index  ON auth.users (updated_at);
 
 DROP FUNCTION IF EXISTS auth.create_user;
 CREATE FUNCTION auth.create_user(
+    id                     INTEGER,
     username               VARCHAR(100),
     first_name             VARCHAR(150),
     last_name              VARCHAR(150),
     email                  VARCHAR(360),
     password               VARCHAR(255),
-    is_staff               BOOLEAN,
     is_active              BOOLEAN
 ) RETURNS INTEGER
 LANGUAGE sql
 AS $$
     INSERT INTO auth.users
     (
+        id,
         username,
         first_name,
         last_name,
         email,
         password,
-        is_staff,
         is_active
     )
     VALUES(
+        COALESCE(id, NEXTVAL('auth.users_id_seq')),
         TRIM(username),
         TRIM(first_name),
         TRIM(last_name),
         LOWER(TRIM(email)),
         utils.CRYPT(TRIM(password), utils.GEN_SALT('bf', 8)),
-        is_staff,
         is_active
     )
     RETURNING id;
@@ -109,7 +107,6 @@ BEGIN
             last_name,
             email,
             password,
-            is_staff,
             is_active
         FROM
             auth.users
@@ -142,8 +139,7 @@ BEGIN
                         'first_name', user_authenticated.first_name,
                         'last_name',  user_authenticated.last_name,
                         'email',      user_authenticated.email,
-                        'password',   user_authenticated.password,
-                        'is_staff',   user_authenticated.is_staff
+                        'password',   user_authenticated.password
                     )
                 FROM
                     user_authenticated
@@ -166,6 +162,20 @@ DROP TABLE IF EXISTS auth.invitations CASCADE;
 CREATE TABLE auth.invitations (
     id          SERIAL PRIMARY KEY,
     invited_by  INTEGER DEFAULT NULL,
+    spaces      JSONB DEFAULT NULL,
+                /*
+                    Example:
+                    [
+                        {
+                            "id": 1,
+                            "role": "space.MEMBER"
+                        },
+                        {
+                            "id": 2,
+                            "role": "space.ADMIN"
+                        }
+                    ]
+                */
     email       VARCHAR(360) DEFAULT NULL,
     token       TEXT,
     expires     TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + '7days'::interval),
@@ -179,34 +189,50 @@ CREATE INDEX invitations_email_index ON auth.invitations (email);
 CREATE INDEX invitations_token_index ON auth.invitations (token);
 CREATE INDEX invitations_user_id_index ON auth.invitations (user_id);
 
--- Load fixture
+DROP TABLE IF EXISTS auth.spaces CASCADE;
+CREATE TABLE auth.spaces (
+    id                SERIAL PRIMARY KEY,
+    parent_space_id   INTEGER DEFAULT NULL,
+    slug              VARCHAR(100) NOT NULL,
+    title             VARCHAR(100) NOT NULL,
 
-SELECT auth.create_user(
-    username   => 'john-doe1',
-    first_name => 'John',
-    last_name  => 'Doe1',
-    email      => 'john.doe1@example.com',
-    password   => 'secret1',
-    is_staff   => true,
-    is_active  => true
+    created_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    updated_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    deleted_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    deleted_at  TIMESTAMP WITH TIME ZONE DEFAULT NULL
+);
+ALTER TABLE auth.spaces ADD CONSTRAINT spaces_parent_space_id_fkey FOREIGN KEY (parent_space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE;
+
+CREATE INDEX spaces_parent_space_id_index ON auth.spaces (parent_space_id);
+CREATE INDEX spaces_slug_index ON auth.spaces (slug);
+CREATE INDEX spaces_created_by_index ON auth.spaces (created_by);
+CREATE INDEX spaces_created_at_index ON auth.spaces (created_at);
+CREATE INDEX spaces_updated_by_index ON auth.spaces (updated_by);
+CREATE INDEX spaces_updated_at_index ON auth.spaces (updated_at);
+CREATE INDEX spaces_deleted_by_index ON auth.spaces (deleted_by);
+CREATE INDEX spaces_deleted_at_index ON auth.spaces (deleted_at);
+
+DROP TYPE IF EXISTS auth.roles;
+CREATE TYPE auth.roles AS ENUM (
+    'space.MEMBER',
+    'space.ADMIN',
+    'space.OWNER'
 );
 
-SELECT auth.create_user(
-    username   => 'john-doe2',
-    first_name => 'John',
-    last_name  => 'Doe2',
-    email      => 'john.doe2@example.com',
-    password   => 'secret2',
-    is_staff   => false,
-    is_active  => true
+DROP TABLE IF EXISTS auth.space_users CASCADE;
+CREATE TABLE auth.space_users (
+    user_id     INTEGER NOT NULL REFERENCES auth.users(id),
+    space_id    INTEGER NOT NULL REFERENCES auth.spaces(id),
+    role        auth.roles NOT NULL,
+    created_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
-SELECT auth.create_user(
-    username   => 'john-doe3',
-    first_name => 'John',
-    last_name  => 'Doe3',
-    email      => 'john.doe3@example.com',
-    password   => 'secret3',
-    is_staff   => false,
-    is_active  => false
-);
+CREATE INDEX space_users_user_id_index ON auth.space_users (user_id);
+CREATE INDEX space_users_space_id_index ON auth.space_users (space_id);
+CREATE INDEX space_users_role_index ON auth.space_users (role);
+CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
+CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);

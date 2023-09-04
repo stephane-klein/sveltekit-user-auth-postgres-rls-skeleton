@@ -1,0 +1,60 @@
+spaces:
+  - slug: space-1
+    title: Space 1
+  - slug: space-2
+    title: Space 2
+  - slug: space-3
+    title: Space 3
+    spaces:
+      - slug: space-3-1
+        title: Space 3.1
+users:
+  - id: 1
+    username: john-doe1
+    first_name: John
+    last_name: Doe1
+    email: john.doe1@example.com
+    password: secret1
+    spaces:
+      - slug: space-1
+        role: space.OWNER
+      - slug: space-2
+        role: space.MEMBER
+      - slug: space-3
+        role: space.OWNER
+      - slug: space-3-1
+        role: space.OWNER
+  - id: 2
+    username: john-doe2
+    first_name: John
+    last_name: Doe2
+    email: john.doe2@example.com
+    password: secret2
+    spaces:
+      - slug: space-1
+        role: space.ADMIN
+      - slug: space-2
+        role: space.OWNER
+      - slug: space-3
+        role: space.MEMBER
+  - id: 3
+    username: john-doe3
+    first_name: John
+    last_name: Doe3
+    email: john.doe3@example.com
+    password: secret3
+    spaces:
+      - slug: space-1
+        role: space.MEMBER
+      - slug: space-2
+        role: space.MEMBER
+      - slug: space-3
+        role: space.MEMBER
+invitations:
+  - email: invited1@example.com
+    invited_by: 1
+    spaces:
+      - slug: space-1
+        role: space.MEMBER
+      - slug: space-2
+        role: space.MEMBER
