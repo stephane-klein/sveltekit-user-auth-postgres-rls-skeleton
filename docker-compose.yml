@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      PGOPTIONS: "--search_path=''"
+    volumes:
+      - ./volumes/postgres/:/var/lib/postgresql/
+    healthcheck:
+      test: ["CMD", "sh", "-c", "pg_isready -U $$POSTGRES_USER -h $$(hostname -i)"]
+      interval: 10s
+      start_period: 30s
+
+  postgres-test:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgrestest
+      POSTGRES_DB: postgrestest
+      POSTGRES_PASSWORD: passwordtest
+      PGOPTIONS: "--search_path=''"
+    ports:
+      - 5433:5432
+    volumes:
+      - ./sqls/:/sqls/
+      - ./volumes/postgres-test/:/var/lib/postgresql-test/
+    healthcheck:
+      test: ["CMD", "sh", "-c", "pg_isready -U $$POSTGRES_USER -h $$(hostname -i)"]
+      interval: 10s
+      start_period: 30s
+
+  maildev:
+    image: maildev/maildev:2.1.0
+    restart: always
+    ports:
+      - "1080:1080"
+      - "1025:1025"

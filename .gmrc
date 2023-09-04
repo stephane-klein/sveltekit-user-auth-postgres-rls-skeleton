@@ -1,0 +1,5 @@
+{
+    "connectionString": "postgres://postgres:password@localhost:5432/myapp",
+    "shadowConnectionString": "postgres://postgres:password@localhost:5432/myapp_shadow",
+    "rootConnectionString": "postgres://postgres:password@localhost:5432/postgres"
+}
