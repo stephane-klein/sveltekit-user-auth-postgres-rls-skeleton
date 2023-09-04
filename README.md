@@ -20,7 +20,7 @@ Start database engine:
 
 ```sh
 $ ./scripts/init.sh
-$ ./scripts/fixtures.sh
+$ ./load-fixtures.js
 ```
 
 Start web server:
