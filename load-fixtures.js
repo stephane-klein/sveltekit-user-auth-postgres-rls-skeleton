@@ -91,7 +91,7 @@ async function main(sql) {
                 SELECT
                     ${invite.email} AS email,
                     ${invite.invited_by} AS invited_by,
-                     JSONB_AGG(ROW_TO_JSON(foo)) AS spaces,
+                    JSONB_AGG(ROW_TO_JSON(foo)) AS spaces,
                     ${token} AS token
                 FROM (
                     SELECT
