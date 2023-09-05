@@ -16,15 +16,17 @@
     {/each}
 </ul>
 
-<h1>Spaces</h1>
+{#if data?.spaces}
+    <h1>Spaces</h1>
 
-<ul>
-    {#each data.spaces as space}
-        <li>
-            <a href={`/space/${space.slug}/`}>{space.id} - {space.title}</a>
-        </li>
-    {/each}
-</ul>
+    <ul>
+        {#each data.spaces as space}
+            <li>
+                <a href={`/space/${space.slug}/`}>{space.id} - {space.title}</a>
+            </li>
+        {/each}
+    </ul>
+{/if}
 
 <hr />
 
