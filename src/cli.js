@@ -29,10 +29,6 @@ yargs(hideBin(process.argv))
                     password: {
                         string: true,
                         demandOption: true
-                    },
-                    staff: {
-                        boolean: true,
-                        default: false
                     }
                 }),
             async(argv) => {
@@ -44,7 +40,6 @@ yargs(hideBin(process.argv))
                             last_name  => ${argv?.lastname || ""},
                             email      => ${argv.email},
                             password   => ${argv.password},
-                            is_staff   => ${argv.staff},
                             is_active  => true
                         );
                     `;

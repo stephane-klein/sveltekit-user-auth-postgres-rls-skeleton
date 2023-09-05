@@ -73,7 +73,6 @@ export const actions = {
                 last_name  => ${data.get("last_name")},
                 email      => ${data.get("email")},
                 password   => ${data.get("password")},
-                is_staff   => false,
                 is_active  => true
             ) AS id;
         `)[0].id;

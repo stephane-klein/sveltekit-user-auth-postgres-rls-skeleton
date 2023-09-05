@@ -21,7 +21,6 @@ test("Create a user and login", async() => {
         last_name  => 'Doe',
         email      => 'john.doe@example.com',
         password   => 'secret',
-        is_staff   => false,
         is_active  => true
     )`)[0]?.create_user;
 
