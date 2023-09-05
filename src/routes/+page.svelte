@@ -22,7 +22,7 @@
     <ul>
         {#each data.spaces as space}
             <li>
-                <a href={`/space/${space.slug}/`}>{space.id} - {space.title}</a>
+                <a href={`/spaces/${space.slug}/`}>{space.id} - {space.title}</a>
             </li>
         {/each}
     </ul>
