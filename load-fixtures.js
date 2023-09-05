@@ -19,20 +19,28 @@ async function main(sql) {
         ALTER SEQUENCE auth.users_id_seq RESTART WITH 1;
     `.simple();
 
-    async function import_spaces(spaces) {
+    async function import_spaces(spaces, parent_space_id) {
         for await (const space of spaces) {
-            await sql`
+            const space_id = (await sql`
                 INSERT INTO auth.spaces
                 ${
-                    sql(space, "slug", "title")
+                    sql({
+                        "parent_space_id": parent_space_id,
+                        "slug": space.slug,
+                        "title": space.title
+                    })
                 }
-            `;
+                RETURNING id
+            `)[0].id;
             if (space?.spaces) {
-                await import_spaces(space.spaces);
+                await import_spaces(
+                    space.spaces,
+                    space_id
+                );
             }
         }
     }
-    await import_spaces(data.spaces);
+    await import_spaces(data.spaces, null);
 
     for await (const user of data.users) {
         const user_id = (await sql`
