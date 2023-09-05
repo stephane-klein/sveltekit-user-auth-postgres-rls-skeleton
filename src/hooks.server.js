@@ -45,10 +45,22 @@ export async function handle({ event, resolve }) {
                     WHERE
                         sessions.id=${sessionId}
                     LIMIT 1
+                ),
+                _spaces AS (
+                    SELECT
+                        spaces.id    AS id,
+                        spaces.slug  AS slug,
+                        spaces.title AS title
+                    FROM _user
+                    LEFT JOIN auth.space_users
+                           ON space_users.user_id=_user.id
+                    LEFT JOIN auth.spaces
+                           ON space_users.space_id=spaces.id
                 )
                 SELECT
                     (SELECT ROW_TO_JSON(_user) FROM _user) AS user,
-                    (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user) AS impersonate_user
+                    (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user) AS impersonate_user,
+                    (SELECT ARRAY_AGG(ROW_TO_JSON(_spaces)) FROM _spaces) AS spaces
             `;
             if (rows?.length > 0) {
                 event.locals.session_id = sessionId;
@@ -61,6 +73,7 @@ export async function handle({ event, resolve }) {
                     event.locals.user = rows[0].impersonate_user;
                     event.locals.impersonated_by = rows[0].user;
                 }
+                event.locals.spaces = rows[0].spaces;
             }
         } catch (e) {
             console.log(e);
