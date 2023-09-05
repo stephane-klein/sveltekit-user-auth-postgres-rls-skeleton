@@ -62,7 +62,7 @@ export async function handle({ event, resolve }) {
                 _current_space AS (
                     SELECT *
                     FROM _spaces
-                    WHERE _spaces.slug=${event.params?.space_slug}
+                    WHERE _spaces.slug=${event.params?.space_slug || null}
                     LIMIT 1
                 )
                 SELECT
