@@ -6,6 +6,9 @@ This project is a spin-off of [`sveltekit-user-auth-skeleton`](https://github.co
 
 Repository starting point issue (in French): https://github.com/stephane-klein/sveltekit-user-auth-skeleton/issues/7
 
+In a real project, the tables `main.resource_a` and `main.resource_b` should be replaced by `products`, `issues`,
+`customers`, `invoices`… entities.
+
 ## Getting started
 
 ```sh
