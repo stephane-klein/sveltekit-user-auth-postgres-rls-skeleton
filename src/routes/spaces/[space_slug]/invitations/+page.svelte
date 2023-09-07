@@ -26,3 +26,5 @@
         {/each}
     </tbody>
 </table>
+
+<p><a href="./add/">Invite a new member in this space...</a></p>

@@ -24,7 +24,13 @@ export const actions = {
                 sql({
                     invited_by: locals.user.id,
                     email: data.get("email"),
-                    token: token
+                    token: token,
+                    spaces: [
+                        {
+                            "id": locals.current_space.id,
+                            "role": "space.MEMBER"
+                        }
+                    ]
                 })
             }
         `;
