@@ -1,4 +1,6 @@
 <script>
+    import { page } from "$app/stores";
+
     export let data;
 </script>
 
@@ -16,6 +18,7 @@
             <th>Role</th>
             <th>Last login</th>
             <th>Created at</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -26,6 +29,7 @@
                 <td>{member.role}</td>
                 <td>{member.last_login}</td>
                 <td>{member.created_at}</td>
+                <td><a href={`/impersonate/${member.username}/?redirect=${$page.url}`}>impersonate</a></td>
             </tr>
         {/each}
     </tbody>

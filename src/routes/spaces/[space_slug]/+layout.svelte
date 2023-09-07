@@ -1,4 +1,6 @@
 <script>
+    import { page } from "$app/stores";
+
     export let data;
 </script>
 
@@ -8,6 +10,13 @@
     <strong>{data.current_space.role}</strong>
     role on
     <a href={`/spaces/${data.current_space.slug}/`}>{data.current_space.title}</a>
+    {#if data?.impersonated}
+        (Impersonated by
+        {data?.impersonated_by?.username}
+        |
+        <a href={`/impersonate/quit/?redirect=${$page.url}`}>Quit impersonate</a>
+        )
+    {/if}
     |
     <a data-sveltekit-reload href="/logout/">Logout</a>
 </p>
