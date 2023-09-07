@@ -12,11 +12,13 @@ const __dirname = path.dirname(__filename);
 async function main(sql) {
     const data = yaml.load(fs.readFileSync(path.resolve(__dirname, "./fixtures.yaml"), "utf8"));
 
-    await sql`TRUNCATE auth.users, auth.sessions, auth.invitations, auth.spaces, auth.space_users`;
+    await sql`TRUNCATE auth.users, auth.sessions, auth.invitations, auth.spaces, auth.space_users, main.resource_a, main.resource_b`;
     await sql`
         ALTER SEQUENCE auth.invitations_id_seq RESTART WITH 1;
         ALTER SEQUENCE auth.spaces_id_seq RESTART WITH 1;
         ALTER SEQUENCE auth.users_id_seq RESTART WITH 1;
+        ALTER SEQUENCE main.resource_a_id_seq RESTART WITH 1;
+        ALTER SEQUENCE main.resource_b_id_seq RESTART WITH 1;
     `.simple();
 
     async function import_spaces(spaces, parent_space_id) {
@@ -115,6 +117,54 @@ async function main(sql) {
                     ON spaces.slug = list.slug
                 ) AS foo
             )
+        `;
+    }
+
+    for await (const resource_a of data.resource_a) {
+        await sql`
+            INSERT INTO main.resource_a
+            (
+                space_id,
+                slug,
+                title,
+                content,
+                created_by
+            )
+            VALUES(
+                (
+                    SELECT id
+                    FROM auth.spaces
+                    WHERE slug=${resource_a.space_slug}
+                ),
+                ${resource_a.slug},
+                ${resource_a.title},
+                ${resource_a.content},
+                ${resource_a.created_by}
+            );
+        `;
+    }
+
+    for await (const resource_b of data.resource_b) {
+        await sql`
+            INSERT INTO main.resource_b
+            (
+                space_id,
+                slug,
+                title,
+                content,
+                created_by
+            )
+            VALUES(
+                (
+                    SELECT id
+                    FROM auth.spaces
+                    WHERE slug=${resource_b.space_slug}
+                ),
+                ${resource_b.slug},
+                ${resource_b.title},
+                ${resource_b.content},
+                ${resource_b.created_by}
+            );
         `;
     }
 }

@@ -68,3 +68,113 @@ invitations:
     spaces:
       - slug: space-2
         role: space.MEMBER
+resource_a:
+  - space_slug: space-1
+    slug: epbmh6h4t2kk
+    title: Resource A - 1
+    content: >
+      Officiis similique ratione fuga eveniet eos sequi aut quibusdam.
+      Alias enim eaque dolores et voluptatum molestiae. Quam repellendus rerum voluptatum libero.
+      Voluptatibus placeat qui fugit nam repudiandae qui.
+      Illo itaque debitis est aperiam atque. Modi dignissimos nostrum quisquam cumque.
+      Nihil autem aut et veritatis aliquam fuga placeat.
+    created_by: 1
+  - space_slug: space-1
+    slug: 7d87mje7mgsl
+    title: Resource A - 2
+    content: >
+      Tempora voluptatem iusto corporis aliquid. Quod sit error ea dignissimos
+      numquam cumque. Voluptatem iusto repellendus quaerat dolores quia.
+      Enim qui modi dolor pariatur dolorum sed cupiditate. Numquam non veniam
+      maxime repellat qui occaecati. Sapiente ipsum omnis modi et eos quia rerum.
+      Et temporibus tenetur et porro quis.
+
+      Totam accusamus ut doloribus sit nostrum. Voluptate et labore recusandae
+      eum occaecati. Neque perferendis ut nihil at non voluptas officia.
+      Doloremque ex nostrum quod nostrum voluptatem. Earum voluptas sequi ad odio
+      rem est quia. Aut omnis non ut neque ut sed temporibus. Cum consequuntur
+      deleniti libero amet. Maxime enim distinctio cupiditate mollitia corrupti.
+      Molestias sint possimus rerum repellat. Vero et odit dolore voluptatem et.
+    created_by: 1
+  - space_slug: space-1
+    slug: hn0zzq6syxyq
+    title: Resource A - 3
+    content: >
+      Veniam et est quo cupiditate dolor et magni.
+      Exercitationem voluptatem perferendis aperiam nobis sunt nobis sunt et.
+      Cumque odio dignissimos aut nam. Qui voluptates molestiae molestias
+      incidunt. Possimus nihil et commodi non earum dolorem ut.
+      Velit quis consequatur minus quia sed ut. Cupiditate quo occaecati
+      laborum non amet dolor est. Expedita dolor fugiat velit.
+
+      Voluptate repudiandae temporibus at dolor ut ipsam doloribus.
+      Asperiores id magnam facere asperiores deserunt reprehenderit. Voluptas
+      officia sed deleniti non est sequi. Neque omnis sed dolores.
+      Velit ut similique totam officiis aut quod. Eius est ducimus ut quas.
+      Ipsum nihil quasi modi autem et deleniti. Ut illum sit consequatur
+      vero commodi sed est. Nihil ut maxime quia itaque blanditiis quas quia.
+    created_by: 1
+  - space_slug: space-2
+    slug: vmt3433ckque
+    title: Resource A - 4
+    content: >
+      Totam delectus in odit. Et totam illum sunt aliquid omnis magnam.
+      Earum corporis vel et tempore maxime quis.
+      Cupiditate aut in natus minima et quia voluptates quia. Vel nemo
+      libero facilis voluptas rerum.
+      Accusantium ex ea iste. Consequatur laborum et placeat sit rerum magni.
+      Porro quisquam ex voluptates veritatis.
+
+      Qui et neque magni dolorem autem. Repudiandae minus voluptate
+      accusantium dolor. Commodi sit dicta et molestiae sunt.
+      Accusantium esse hic illo voluptate enim quisquam. Magnam porro
+      suscipit ratione eius omnis in sit. Sequi quae velit iure qui
+      qui amet quidem. Est et dicta alias placeat ullam ab voluptates.
+      Est qui facere voluptatem velit aut commodi nesciunt.
+    created_by: 1
+
+resource_b:
+  - space_slug: space-1
+    slug: 229wmj33jiul
+    title: Resource B - 1
+    content: >
+      Vel voluptatem laborum non qui suscipit eaque. Ut maxime et dolor quia.
+      Nisi qui saepe non voluptates. Qui voluptate totam consequatur. Minima voluptatibus ut ut
+      consequatur eum magni ut sequi. Cum expedita et totam omnis porro odit tempora tempora.
+      Dolores nobis est eius nihil sed. Totam rerum reprehenderit laudantium. Aspernatur occaecati id ut natus. Suscipit ipsam at debitis ad.
+
+      Aut dignissimos dignissimos aperiam cupiditate dignissimos illum. Id voluptate
+      voluptatem corporis hic. Praesentium sed ullam ratione quo consequatur quo.
+      Soluta aut dolore inventore assumenda maiores dolores est. Id ipsum blanditiis molestiae ut.
+    created_by: 1
+  - space_slug: space-1
+    slug: 6glpup6ppfuz
+    title: Resource B - 2
+    content: >
+      Quos nemo quos et velit aut. Pariatur similique et voluptas et. Voluptas minima et
+      repellat non magni earum neque. Deserunt consequatur deleniti aut dolorem dolore exercitationem.
+      Repellendus est magnam earum nobis tempore. Ea aut qui eveniet aspernatur.
+      Porro omnis excepturi aut sit vel. Expedita fugiat aut vel facere. Accusamus itaque quo
+      illo ut officia animi. Nesciunt quo quisquam aut repudiandae. Accusantium ipsa minus et qui.
+
+      Mollitia cum laboriosam cumque perspiciatis eum error facilis. Voluptatem fugiat nobis
+      dolorem repellat. Eaque et quis ab. Nostrum non sit velit sit et distinctio.
+      Animi modi eos molestiae. Laudantium commodi ut explicabo omnis consectetur. Ipsam in autem quos.
+    created_by: 1
+  - space_slug: space-1
+    slug: 4b5pi77b2qmh
+    title: Resource B - 3
+    content: >
+      Neque beatae mollitia ducimus dolores quaerat quod et. Voluptatem a ut a qui.
+      Aperiam et ut quidem a. Nostrum nisi ab cum repudiandae doloribus fuga eveniet.
+      Temporibus incidunt veritatis sed eveniet. Nostrum ab a recusandae sed laudantium
+      voluptatibus debitis officia. Nobis error quam ut soluta. Labore fugit eligendi
+      laborum ut reiciendis. Vel quod repudiandae eum reiciendis sint corrupti illum.
+      Maxime omnis quae nobis quis et natus sunt sed. Voluptas neque delectus id pariatur recusandae.
+
+      Nostrum sunt suscipit labore velit odit et. Dolores quam voluptas commodi optio.
+      Dignissimos autem aut quam et velit harum. Cumque velit ad quis qui mollitia ut.
+      Officiis laborum ex quia. Placeat est sed molestiae optio et ipsum nulla commodi.
+      Debitis reiciendis maxime ipsa possimus occaecati ut sed. Unde in doloremque a
+      facilis minima. Sit sint veritatis a quia. Inventore qui ab voluptatum ullam optio error.
+    created_by: 1

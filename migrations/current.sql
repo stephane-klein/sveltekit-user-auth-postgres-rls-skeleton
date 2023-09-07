@@ -1,6 +1,7 @@
 -- Enter migration here
 DROP SCHEMA IF EXISTS public CASCADE;
 DROP SCHEMA IF EXISTS auth CASCADE;
+DROP SCHEMA IF EXISTS main CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS utils;
 
@@ -208,13 +209,13 @@ CREATE TABLE auth.spaces (
 ALTER TABLE auth.spaces ADD CONSTRAINT spaces_parent_space_id_fkey FOREIGN KEY (parent_space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE;
 
 CREATE INDEX spaces_parent_space_id_index ON auth.spaces (parent_space_id);
-CREATE INDEX spaces_slug_index ON auth.spaces (slug);
-CREATE INDEX spaces_created_by_index ON auth.spaces (created_by);
-CREATE INDEX spaces_created_at_index ON auth.spaces (created_at);
-CREATE INDEX spaces_updated_by_index ON auth.spaces (updated_by);
-CREATE INDEX spaces_updated_at_index ON auth.spaces (updated_at);
-CREATE INDEX spaces_deleted_by_index ON auth.spaces (deleted_by);
-CREATE INDEX spaces_deleted_at_index ON auth.spaces (deleted_at);
+CREATE INDEX spaces_slug_index            ON auth.spaces (slug);
+CREATE INDEX spaces_created_by_index      ON auth.spaces (created_by);
+CREATE INDEX spaces_created_at_index      ON auth.spaces (created_at);
+CREATE INDEX spaces_updated_by_index      ON auth.spaces (updated_by);
+CREATE INDEX spaces_updated_at_index      ON auth.spaces (updated_at);
+CREATE INDEX spaces_deleted_by_index      ON auth.spaces (deleted_by);
+CREATE INDEX spaces_deleted_at_index      ON auth.spaces (deleted_at);
 
 DROP TYPE IF EXISTS auth.roles;
 CREATE TYPE auth.roles AS ENUM (
@@ -236,3 +237,61 @@ CREATE INDEX space_users_space_id_index ON auth.space_users (space_id);
 CREATE INDEX space_users_role_index ON auth.space_users (role);
 CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
+
+CREATE SCHEMA IF NOT EXISTS main;
+
+DROP TABLE IF EXISTS main.resource_a CASCADE;
+CREATE TABLE main.resource_a (
+    id                     SERIAL PRIMARY KEY,
+    space_id               INTEGER NOT NULL,
+    slug                   VARCHAR(12) NOT NULL, -- contains nanoid
+    title                  VARCHAR(100) NOT NULL,
+    content                TEXT NOT NULL,
+
+    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    deleted_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    CONSTRAINT fk_space_id FOREIGN KEY (space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE
+);
+CREATE INDEX resource_a_space_id_index  ON main.resource_a (space_id);
+CREATE INDEX resource_a_slug_index       ON main.resource_a (slug);
+CREATE INDEX resource_a_created_at_index ON main.resource_a (created_at);
+CREATE INDEX resource_a_created_by_index ON main.resource_a (created_by);
+CREATE INDEX resource_a_updated_at_index ON main.resource_a (updated_at);
+CREATE INDEX resource_a_updated_by_index ON main.resource_a (updated_by);
+CREATE INDEX resource_a_deleted_at_index ON main.resource_a (deleted_at);
+CREATE INDEX resource_a_deleted_by_index ON main.resource_a (deleted_by);
+
+DROP TABLE IF EXISTS main.resource_b CASCADE;
+CREATE TABLE main.resource_b (
+    id                     SERIAL PRIMARY KEY,
+    space_id               INTEGER NOT NULL,
+    slug                   VARCHAR(12) NOT NULL, -- contains nanoid
+    title                  VARCHAR(100) NOT NULL,
+    content                TEXT NOT NULL,
+
+    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    deleted_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    CONSTRAINT fk_space_id FOREIGN KEY (space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE
+);
+CREATE INDEX resource_b_space_id_index  ON main.resource_b (space_id);
+CREATE INDEX resource_b_slug_index       ON main.resource_b (slug);
+CREATE INDEX resource_b_created_at_index ON main.resource_b (created_at);
+CREATE INDEX resource_b_created_by_index ON main.resource_b (created_by);
+CREATE INDEX resource_b_updated_at_index ON main.resource_b (updated_at);
+CREATE INDEX resource_b_updated_by_index ON main.resource_b (updated_by);
+CREATE INDEX resource_b_deleted_at_index ON main.resource_b (deleted_at);
+CREATE INDEX resource_b_deleted_by_index ON main.resource_b (deleted_by);
