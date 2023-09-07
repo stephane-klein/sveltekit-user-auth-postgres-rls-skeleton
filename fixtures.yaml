@@ -58,3 +58,13 @@ invitations:
         role: space.MEMBER
       - slug: space-2
         role: space.MEMBER
+  - email: invited2@example.com
+    invited_by: 1
+    spaces:
+      - slug: space-2
+        role: space.MEMBER
+  - email: invited3@example.com
+    invited_by: 1
+    spaces:
+      - slug: space-2
+        role: space.MEMBER
