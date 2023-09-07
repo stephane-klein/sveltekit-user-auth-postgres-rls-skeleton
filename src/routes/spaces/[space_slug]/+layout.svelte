@@ -3,6 +3,18 @@
 </script>
 
 <p>
+    Connected as <strong>{data.user.username}</strong>
+    , who has
+    <strong>{data.current_space.role}</strong>
+    role on
+    <a href={`/spaces/${data.current_space.slug}/`}>{data.current_space.title}</a>
+    |
+    <a data-sveltekit-reload href="/logout/">Logout</a>
+</p>
+
+<hr />
+
+<p>
     Current space: <a href={`/spaces/${data.current_space.slug}/`}>{data.current_space.title}</a>
 </p>
 
