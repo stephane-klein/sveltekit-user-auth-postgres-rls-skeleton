@@ -12,10 +12,12 @@ afterAll(() => {
 });
 
 test("Create a user and login", async() => {
-    await sql`DELETE FROM auth.users`;
-    await sql`DELETE FROM auth.sessions`;
+    await sql`DELETE FROM auth.space_users CASCADE`;
+    await sql`DELETE FROM auth.users CASCADE`;
+    await sql`DELETE FROM auth.sessions CASCADE`;
 
     const userId = (await sql`SELECT auth.create_user(
+        id         => null,
         username   => 'john-doe',
         first_name => 'John',
         last_name  => 'Doe',

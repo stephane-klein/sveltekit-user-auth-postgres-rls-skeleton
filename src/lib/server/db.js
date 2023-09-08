@@ -1,7 +1,7 @@
 import postgres from "postgres";
 
 const sql = postgres(
-    process.env.POSTGRES_URL || "postgres://postgres:password@localhost:5432/myapp"
+    process.env.POSTGRES_URL || "postgres://webapp:password@localhost:5432/myapp"
 );
 
 // await sql.reserve() have a bug, it didn't execute auto fetching of array types
