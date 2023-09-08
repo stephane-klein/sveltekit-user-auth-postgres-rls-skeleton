@@ -8,6 +8,23 @@ CREATE SCHEMA IF NOT EXISTS utils;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA utils;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA utils;
 
+-- Helper section
+
+CREATE OR REPLACE FUNCTION utils.create_role_if_not_exists(rolename NAME) RETURNS TEXT AS
+$$
+BEGIN
+    IF NOT EXISTS (SELECT * FROM pg_roles WHERE rolname = rolename) THEN
+        EXECUTE format('CREATE ROLE %I', rolename);
+        RETURN 'CREATE ROLE';
+    ELSE
+        RETURN format('ROLE ''%I'' ALREADY EXISTS', rolename);
+    END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+-- Auth section
+
 CREATE SCHEMA IF NOT EXISTS auth;
 
 DROP TABLE IF EXISTS auth.users CASCADE;
@@ -238,6 +255,32 @@ CREATE INDEX space_users_role_index ON auth.space_users (role);
 CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
 
+DROP FUNCTION IF EXISTS auth.open_session;
+CREATE FUNCTION auth.open_session(session_id UUID) RETURNS VOID
+LANGUAGE sql
+AS $$
+    SELECT
+        SET_CONFIG(
+            'auth.user_id',
+            sessions.user_id::VARCHAR,
+            FALSE
+        ),
+        SET_CONFIG(
+            'auth.spaces',
+            ARRAY_TO_STRING(ARRAY_AGG(space_id), ','),
+            FALSE
+        )
+        FROM auth.sessions
+        LEFT JOIN auth.space_users
+               ON sessions.user_id = space_users.user_id
+        WHERE sessions.id=session_id
+        GROUP BY sessions.user_id;
+
+    SET ROLE TO application_user;
+$$;
+
+-- Main section
+
 CREATE SCHEMA IF NOT EXISTS main;
 
 DROP TABLE IF EXISTS main.resource_a CASCADE;
@@ -295,3 +338,86 @@ CREATE INDEX resource_b_updated_at_index ON main.resource_b (updated_at);
 CREATE INDEX resource_b_updated_by_index ON main.resource_b (updated_by);
 CREATE INDEX resource_b_deleted_at_index ON main.resource_b (deleted_at);
 CREATE INDEX resource_b_deleted_by_index ON main.resource_b (deleted_by);
+
+-- Setup Row-Level Security (https://www.postgresql.org/docs/15/ddl-rowsecurity.html)
+
+SELECT utils.create_role_if_not_exists('application_user');
+COMMENT ON ROLE application_user IS
+    'The "application_user" role is to be used by the web application,'
+    'because it enables communication with PostgreSQL in a session that'
+    'applies user permissions rules to resources (POLICY, RLS features)';
+
+GRANT ALL ON SCHEMA auth TO application_user;
+GRANT ALL ON SCHEMA main TO application_user;
+GRANT ALL ON ALL TABLES IN SCHEMA auth TO application_user;
+GRANT ALL ON ALL TABLES IN SCHEMA main TO application_user;
+
+ALTER TABLE auth.users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.sessions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.spaces      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.space_users ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
+ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY space_read
+    ON auth.spaces
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        id = ANY(
+            REGEXP_SPLIT_TO_ARRAY(
+                CURRENT_SETTING('auth.spaces', TRUE),
+                ','
+            )::INTEGER[]
+        )
+    );
+
+CREATE POLICY space_users_read
+    ON auth.space_users
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        space_id = ANY(
+            REGEXP_SPLIT_TO_ARRAY(
+                CURRENT_SETTING('auth.spaces', TRUE),
+                ','
+            )::INTEGER[]
+        )
+    );
+
+CREATE POLICY user_read
+    ON auth.users
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        id = ANY(
+            SELECT user_id
+            FROM auth.space_users
+            WHERE
+                space_id = ANY(
+                    REGEXP_SPLIT_TO_ARRAY(
+                        CURRENT_SETTING('auth.spaces', TRUE),
+                        ','
+                    )::INTEGER[]
+                )
+        )
+    );
+
+CREATE POLICY resource_a_read
+    ON main.resource_a
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        space_id = ANY(
+            REGEXP_SPLIT_TO_ARRAY(
+                CURRENT_SETTING('auth.spaces', TRUE),
+                ','
+            )::INTEGER[]
+        )
+    );

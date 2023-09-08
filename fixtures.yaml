@@ -32,10 +32,6 @@ users:
     password: secret2
     spaces:
       - slug: space-1
-        role: space.ADMIN
-      - slug: space-2
-        role: space.OWNER
-      - slug: space-3
         role: space.MEMBER
   - id: 3
     username: john-doe3
@@ -48,6 +44,15 @@ users:
         role: space.MEMBER
       - slug: space-2
         role: space.MEMBER
+      - slug: space-3
+        role: space.MEMBER
+  - id: 4
+    username: john-doe4
+    first_name: John
+    last_name: Doe4
+    email: john.doe4@example.com
+    password: secret4
+    spaces:
       - slug: space-3
         role: space.MEMBER
 invitations:

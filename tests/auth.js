@@ -11,6 +11,13 @@ afterAll(() => {
     sql.end();
 });
 
+describe(
+    const result = await sql`
+        SELECT auth.
+    `;
+    result
+);
+
 test("Create a user and login", async() => {
     await sql`DELETE FROM auth.users`;
     await sql`DELETE FROM auth.sessions`;
