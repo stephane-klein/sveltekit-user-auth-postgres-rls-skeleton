@@ -1,9 +1,7 @@
-import sql from "$lib/server/db.js";
-
 export async function load({locals}) {
     return {
         members: (
-            await sql`
+            await locals.sql`
                 SELECT
                     users.id         AS id,
                     users.username   AS username,
@@ -19,7 +17,7 @@ export async function load({locals}) {
                 LEFT JOIN auth.users
                        ON space_users.user_id=users.id
 
-                    WHERE space_users.space_id=${locals.current_space.id}
+                    WHERE space_users.space_id=${locals.client.current_space.id}
 
                  ORDER BY users.created_at
             `

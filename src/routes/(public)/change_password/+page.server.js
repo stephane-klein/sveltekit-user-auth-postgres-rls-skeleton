@@ -1,9 +1,8 @@
 import logger from "$lib/server/logger.js";
-import sql from "$lib/server/db.js";
 import jwt from "jsonwebtoken";
 import mail from "$lib/server/mail.js";
 
-export async function load({ url }) {
+export async function load({ locals, url }) {
     let decoded;
     try {
         decoded = jwt.verify(
@@ -18,12 +17,12 @@ export async function load({ url }) {
 
     return {
         tokenValid: true,
-        email: (await sql`SELECT email FROM auth.users WHERE id=${decoded.subject}`)[0].email
+        email: (await locals.sql`SELECT email FROM auth.users WHERE id=${decoded.subject}`)[0].email
     };
 }
 
 export const actions = {
-    default: async({ request, url }) => {
+    default: async({ locals, request, url }) => {
         let decoded;
         try {
             decoded = jwt.verify(
@@ -52,7 +51,7 @@ export const actions = {
             };
         }
 
-        await sql`
+        await locals.sql`
             UPDATE auth.users
                SET password=utils.CRYPT(TRIM(${data.get("password").trim()}), utils.GEN_SALT('bf', 8))
              WHERE id=${decoded.subject}
@@ -63,7 +62,7 @@ export const actions = {
             },
             "Password updated"
         );
-        const email = (await sql`SELECT email FROM auth.users WHERE id=${decoded.subject}`)[0].email;
+        const email = (await locals.sql`SELECT email FROM auth.users WHERE id=${decoded.subject}`)[0].email;
 
         const info = await mail.sendMail({
             from: "noreply@example.com",

@@ -1,9 +1,7 @@
-import sql from "$lib/server/db.js";
-
 export async function load({locals}) {
     return {
         invitations: (
-            await sql`
+            await locals.sql`
                 SELECT
                     invitations.id                             AS id,
                     invitations.invited_by                     AS invited_by,
@@ -17,7 +15,7 @@ export async function load({locals}) {
                 LEFT JOIN auth.users
                        ON invitations.invited_by = users.id
 
-                WHERE spaces @> ${[{id: locals.current_space.id}]}
+                WHERE spaces @> ${[{id: locals.client.current_space.id}]}
 
                 ORDER BY invitations.expires
             `

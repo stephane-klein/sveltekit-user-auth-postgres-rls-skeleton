@@ -47,7 +47,7 @@
 		"pino": "8.15.0",
 		"pino-caller": "3.4.0",
 		"pino-pretty": "10.2.0",
-		"postgres": "3.3.5",
+		"postgres": "https://github.com/porsager/postgres/archive/b4c2526ba13e4f20f286b087887510e36c855f2f.tar.gz",
 		"svelte": "4.2.0",
 		"vite": "4.4.9",
 		"yargs": "17.7.2"

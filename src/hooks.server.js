@@ -1,13 +1,17 @@
 import sql from "$lib/server/db.js";
 
 export async function handle({ event, resolve }) {
-    console.log(event.params);
+    // See https://github.com/porsager/postgres/pull/667/files
+    event.locals.sql = await sql.reserve();
+
+    // Data transferred to the browser
+    event.locals.client = {};
+
     const sessionId = event.cookies.get("session");
 
     if (sessionId) {
-        console.log(event);
         try {
-            const rows = await sql`
+            const rows = await event.locals.sql`
                 WITH _user AS (
                     SELECT
                         users.id,
@@ -69,30 +73,30 @@ export async function handle({ event, resolve }) {
                 SELECT
                     (SELECT ROW_TO_JSON(_user) FROM _user) AS user,
                     (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user) AS impersonate_user,
-                    (SELECT ARRAY_AGG(ROW_TO_JSON(_spaces)) FROM _spaces) AS spaces,
+                    (SELECT ARRAY_AGG(ROW_TO_JSON(_spaces)) FROM _spaces)::JSONB[] AS spaces,
                     (SELECT ROW_TO_JSON(_current_space) FROM _current_space) AS current_space
             `;
             if (rows?.length > 0) {
                 event.locals.session_id = sessionId;
                 if (rows[0].impersonate_user === null) {
-                    event.locals.impersonated = false;
-                    event.locals.user = rows[0].user;
-                    event.locals.impersonated_by = null;
+                    event.locals.client.impersonated = false;
+                    event.locals.client.user = rows[0].user;
+                    event.locals.client.impersonated_by = null;
                 } else {
-                    event.locals.impersonated = true;
-                    event.locals.user = rows[0].impersonate_user;
-                    event.locals.impersonated_by = rows[0].user;
+                    event.locals.client.impersonated = true;
+                    event.locals.client.user = rows[0].impersonate_user;
+                    event.locals.client.impersonated_by = rows[0].user;
                 }
-                event.locals.spaces = rows[0].spaces;
-                event.locals.current_space = rows[0].current_space;
-                console.log(event.locals);
+                event.locals.client.spaces = rows[0].spaces;
+                event.locals.client.current_space = rows[0].current_space;
             }
         } catch (e) {
             console.log(e);
         }
     }
-    if (!event.locals.user) event.cookies.delete("session");
+    if (!event.locals.client.user) event.cookies.delete("session");
 
     const response = await resolve(event);
+    event.locals.sql.release();
     return response;
 }

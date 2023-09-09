@@ -1,7 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import jwt from "jsonwebtoken";
 import logger from "$lib/server/logger.js";
-import sql from "$lib/server/db.js";
 import mail from "$lib/server/mail.js";
 
 export const actions = {
@@ -10,7 +9,7 @@ export const actions = {
 
         const token = jwt.sign(
             {
-                user_id: locals.user.id,
+                user_id: locals.client.user.id,
                 email: data.get("email")
             },
             process.env.SECRET || "secret",
@@ -19,15 +18,15 @@ export const actions = {
             }
         );
 
-        await sql`
+        await locals.sql`
             INSERT INTO auth.invitations ${
-                sql({
-                    invited_by: locals.user.id,
+                locals.sql({
+                    invited_by: locals.client.user.id,
                     email: data.get("email"),
                     token: token,
                     spaces: [
                         {
-                            "id": locals.current_space.id,
+                            "id": locals.client.current_space.id,
                             "role": "space.MEMBER"
                         }
                     ]
@@ -49,7 +48,7 @@ export const actions = {
 
         logger.info(
             {
-                invited_by: locals.user.id,
+                invited_by: locals.client.user.id,
                 email: data.get("email"),
                 token: token,
                 messageId: messageId

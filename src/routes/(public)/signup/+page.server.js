@@ -1,13 +1,12 @@
 import { redirect } from "@sveltejs/kit";
-import sql from "$lib/server/db.js";
 
 export async function load({ locals, url }) {
-    if (locals.user) {
+    if (locals.client.user) {
         throw redirect(302, "/");
     }
 
     if (url.searchParams.get("token")) {
-        const invitation = (await sql`SELECT email, expires, user_id FROM auth.invitations WHERE token=${url.searchParams.get("token")}`)?.[0];
+        const invitation = (await locals.sql`SELECT email, expires, user_id FROM auth.invitations WHERE token=${url.searchParams.get("token")}`)?.[0];
         if (!invitation) {
             return {
                 error: "Error: invalid invitation token"

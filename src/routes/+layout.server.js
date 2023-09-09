@@ -1,7 +1,7 @@
 export async function load({ locals }) {
-    if (locals?.user) {
+    if (locals.client?.user) {
         return {
-            ...locals
+            ...locals.client
         };
     }
 }

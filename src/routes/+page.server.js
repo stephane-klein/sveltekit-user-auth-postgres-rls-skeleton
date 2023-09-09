@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 
 export async function load({locals}) {
-    if (locals.user)
+    if (locals.client.user)
         throw redirect(302, "/spaces/");
 }

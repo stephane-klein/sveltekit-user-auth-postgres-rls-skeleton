@@ -1,10 +1,9 @@
 import { redirect, fail } from "@sveltejs/kit";
-import sql from "$lib/server/db.js";
 
 export const actions = {
-    default: async({ request, cookies }) => {
+    default: async({ locals, request, cookies }) => {
         const data = await request.formData();
-        const authenticateResult = (await sql`
+        const authenticateResult = (await locals.sql`
             SELECT auth.authenticate(
                 input_username=>'',
                 input_email=>${data.get("email")},

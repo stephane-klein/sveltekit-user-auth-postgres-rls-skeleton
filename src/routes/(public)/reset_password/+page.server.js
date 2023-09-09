@@ -1,12 +1,11 @@
 import logger from "$lib/server/logger.js";
 import jwt from "jsonwebtoken";
-import sql from "$lib/server/db.js";
 import mail from "$lib/server/mail.js";
 
 export const actions = {
     default: async({ request }) => {
         const data = await request.formData();
-        const user = await sql`SELECT * FROM auth.users WHERE email=${data.get("email")}`;
+        const user = await locals.sql`SELECT * FROM auth.users WHERE email=${data.get("email")}`;
 
         if (user.length === 1) {
             const token = jwt.sign(
