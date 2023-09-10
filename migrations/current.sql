@@ -372,6 +372,13 @@ COMMENT ON ROLE application_user IS
     'because it enables communication with PostgreSQL in a session that'
     'applies user permissions rules to resources (POLICY, RLS features)';
 
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT * FROM pg_roles WHERE rolname = 'webapp') THEN
+        CREATE ROLE webapp LOGIN PASSWORD 'password' IN ROLE application_user;
+        GRANT CONNECT ON DATABASE myapp TO webapp;
+    END IF;
+END $$;
+
 GRANT ALL ON SCHEMA utils TO application_user;
 GRANT ALL ON SCHEMA auth TO application_user;
 GRANT ALL ON SCHEMA main TO application_user;

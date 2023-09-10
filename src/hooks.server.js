@@ -11,9 +11,6 @@ export async function handle({ event, resolve }) {
 
     if (sessionId) {
         await event.locals.sql`
-            SET SESSION ROLE TO application_user;
-        `;
-        await event.locals.sql`
             SELECT auth.open_session(${sessionId});
         `;
         try {
