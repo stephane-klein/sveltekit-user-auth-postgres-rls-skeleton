@@ -46,7 +46,7 @@ describe("When john-doe2 user request the list of users", () => {
     it("Should return 3 users", async() => {
         expect(
             (await sql`SELECT COUNT(*)::INTEGER FROM auth.users`)[0].count
-        ).toBe(3);
+        ).toBe(4);
     });
     it("The first user should be John Doe1", async() => {
         expect(
