@@ -263,12 +263,12 @@ AS $$
         SET_CONFIG(
             'auth.user_id',
             sessions.user_id::VARCHAR,
-            FALSE
+            TRUE
         ),
         SET_CONFIG(
             'auth.spaces',
             ARRAY_TO_STRING(ARRAY_AGG(space_id), ','),
-            FALSE
+            TRUE
         )
         FROM auth.sessions
         LEFT JOIN auth.space_users
@@ -276,7 +276,7 @@ AS $$
         WHERE sessions.id=session_id
         GROUP BY sessions.user_id;
 
-    SET ROLE TO application_user;
+    SET LOCAL ROLE TO application_user;
 $$;
 
 -- Main section
