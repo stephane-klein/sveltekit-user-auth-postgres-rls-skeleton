@@ -10,6 +10,12 @@ export async function handle({ event, resolve }) {
     const sessionId = event.cookies.get("session");
 
     if (sessionId) {
+        await event.locals.sql`
+            SET SESSION ROLE TO application_user;
+        `;
+        await event.locals.sql`
+            SELECT auth.open_session(${sessionId});
+        `;
         try {
             const rows = await event.locals.sql`
                 WITH _user AS (
@@ -97,6 +103,9 @@ export async function handle({ event, resolve }) {
     if (!event.locals.client.user) event.cookies.delete("session");
 
     const response = await resolve(event);
+    await event.locals.sql`
+        SELECT auth.close_session();
+    `;
     event.locals.sql.release();
     return response;
 }

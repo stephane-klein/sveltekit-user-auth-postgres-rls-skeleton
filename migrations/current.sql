@@ -112,7 +112,7 @@ CREATE FUNCTION auth.authenticate(
     input_email    VARCHAR(360),
     input_password VARCHAR(255)
 ) RETURNS JSON
-LANGUAGE 'plpgsql'
+LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
 DECLARE
     response JSON;
@@ -257,31 +257,51 @@ CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
 
 DROP FUNCTION IF EXISTS auth.open_session;
 CREATE FUNCTION auth.open_session(session_id UUID) RETURNS VOID
-LANGUAGE sql
+LANGUAGE sql SECURITY DEFINER
 AS $$
     SELECT
         SET_CONFIG(
             'auth.session_id',
             session_id::VARCHAR,
-            TRUE
+            FALSE
         ),
         SET_CONFIG(
             'auth.user_id',
             sessions.user_id::VARCHAR,
-            TRUE
+            FALSE
         ),
         SET_CONFIG(
             'auth.spaces',
             ARRAY_TO_STRING(ARRAY_AGG(space_id), ','),
-            TRUE
+            FALSE
         )
         FROM auth.sessions
         LEFT JOIN auth.space_users
                ON sessions.user_id = space_users.user_id
         WHERE sessions.id=session_id
         GROUP BY sessions.user_id;
+$$;
 
-    SET LOCAL ROLE TO application_user;
+DROP FUNCTION IF EXISTS auth.close_session;
+CREATE FUNCTION auth.close_session() RETURNS VOID
+LANGUAGE sql SECURITY DEFINER
+AS $$
+    SELECT
+        SET_CONFIG(
+            'auth.session_id',
+            '',
+            FALSE
+        ),
+        SET_CONFIG(
+            'auth.user_id',
+            '',
+            FALSE
+        ),
+        SET_CONFIG(
+            'auth.spaces',
+            '',
+            FALSE
+        );
 $$;
 
 -- Main section
@@ -352,6 +372,7 @@ COMMENT ON ROLE application_user IS
     'because it enables communication with PostgreSQL in a session that'
     'applies user permissions rules to resources (POLICY, RLS features)';
 
+GRANT ALL ON SCHEMA utils TO application_user;
 GRANT ALL ON SCHEMA auth TO application_user;
 GRANT ALL ON SCHEMA main TO application_user;
 GRANT ALL ON ALL TABLES IN SCHEMA auth TO application_user;
