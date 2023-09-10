@@ -3,6 +3,29 @@ import fixture from "../load-fixtures.js";
 
 let sql;
 
+describe("When session is open", () => {
+    it("User must be able to read sessions informations", async() => {
+        sql = postgres(
+            "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+        );
+        await fixture(sql);
+        const result = await sql.begin((sql) => [
+            sql`SELECT auth.open_session(
+                    (SELECT auth.authenticate(
+                        input_username := 'john-doe1',
+                        input_email := NULL,
+                        input_password := 'secret1'
+                    ) ->> 'session_id')::UUID
+            )`,
+            sql`SELECT user_id FROM auth.sessions`
+        ]);
+        expect(
+            result.at(-1)[0].user_id
+        ).toBe(1);
+        sql.end();
+    });
+});
+
 describe("When john-doe1 user request the list of spaces", () => {
     it("Should return 4 spaces", async() => {
         sql = postgres(

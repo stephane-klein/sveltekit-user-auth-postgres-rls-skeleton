@@ -261,6 +261,11 @@ LANGUAGE sql
 AS $$
     SELECT
         SET_CONFIG(
+            'auth.session_id',
+            session_id::VARCHAR,
+            TRUE
+        ),
+        SET_CONFIG(
             'auth.user_id',
             sessions.user_id::VARCHAR,
             TRUE
@@ -360,6 +365,15 @@ ALTER TABLE auth.space_users ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY session_read
+    ON auth.sessions
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        user_id = CURRENT_SETTING('auth.user_id', TRUE)::INTEGER
+    );
 
 CREATE POLICY space_read
     ON auth.spaces
