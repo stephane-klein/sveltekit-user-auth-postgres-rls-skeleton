@@ -2,13 +2,23 @@ import postgres from "postgres";
 import fixture from "../load-fixtures.js";
 
 let sql;
+let sqlFixture;
+
+beforeAll(() => {
+    sqlFixture = postgres(
+        "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+    );
+});
+afterAll(() => {
+    sqlFixture.end();
+});
 
 describe("When session is open", () => {
     it("User must be able to read sessions informations", async() => {
         sql = postgres(
-            "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+            "postgres://webapp:password@localhost:5433/myapp"
         );
-        await fixture(sql);
+        await fixture(sqlFixture);
         const result = await sql.begin((sql) => [
             sql`SELECT auth.open_session(
                     (SELECT auth.authenticate(
@@ -29,9 +39,9 @@ describe("When session is open", () => {
 describe("When john-doe1 user request the list of spaces", () => {
     it("Should return 4 spaces", async() => {
         sql = postgres(
-            "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+            "postgres://webapp:password@localhost:5433/myapp"
         );
-        await fixture(sql);
+        await fixture(sqlFixture);
         const result = await sql.begin((sql) => [
             sql`SELECT auth.open_session(
                     (SELECT auth.authenticate(
@@ -52,9 +62,9 @@ describe("When john-doe1 user request the list of spaces", () => {
 describe("When john-doe2 user request the list of users", () => {
     beforeAll(async() => {
         sql = postgres(
-            "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+            "postgres://webapp:password@localhost:5433/myapp"
         );
-        await fixture(sql);
+        await fixture(sqlFixture);
         await sql`SELECT auth.open_session(
                 (SELECT auth.authenticate(
                     input_username := 'john-doe2',
@@ -69,7 +79,7 @@ describe("When john-doe2 user request the list of users", () => {
     it("Should return 3 users", async() => {
         expect(
             (await sql`SELECT COUNT(*)::INTEGER FROM auth.users`)[0].count
-        ).toBe(4);
+        ).toBe(3);
     });
     it("The first user should be John Doe1", async() => {
         expect(
@@ -90,9 +100,9 @@ describe("When john-doe2 user request the list of users", () => {
 describe("When john-doe2 user request the list of spaces", () => {
     it("Should return 1 space", async() => {
         sql = postgres(
-            "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+            "postgres://webapp:password@localhost:5433/myapp"
         );
-        await fixture(sql);
+        await fixture(sqlFixture);
         const result = await sql.begin((sql) => [
             sql`SELECT auth.open_session(
                     (SELECT auth.authenticate(

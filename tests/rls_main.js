@@ -5,7 +5,7 @@ let sql;
 
 beforeEach(async() => {
     sql = postgres(
-        "postgres://postgrestest:passwordtest@localhost:5433/myapp"
+        "postgres://webapp:password@localhost:5433/myapp"
     );
 });
 afterEach(() => {
