@@ -119,3 +119,55 @@ describe("When john-doe2 user request the list of spaces", () => {
         sql.end();
     });
 });
+
+describe("When admin john-doe1 is connected", () => {
+    it("john-doe1 should be able update to read sessions informations", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+        const result = await sql.begin((sql) => [
+            sql`SELECT auth.open_session(
+                    (SELECT auth.authenticate(
+                        input_username := 'john-doe1',
+                        input_email := NULL,
+                        input_password := 'secret1'
+                    ) ->> 'session_id')::UUID
+            )`,
+            sql`SELECT user_id FROM auth.sessions`
+        ]);
+        expect(
+            result.at(-1)[0].user_id
+        ).toBe(1);
+        sql.end();
+    });
+    it("john-doe1 should be able to impersonate john-doe2", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+        const result = await sql.begin((sql) => [
+            sql`SELECT auth.open_session(
+                    (SELECT auth.authenticate(
+                        input_username := 'john-doe1',
+                        input_email := NULL,
+                        input_password := 'secret1'
+                    ) ->> 'session_id')::UUID
+            )`,
+            sql`SELECT auth.impersonate('john-doe2')`,
+            sql`SELECT impersonate_user_id FROM auth.sessions WHERE user_id=1`,
+            sql`SELECT auth.exit_impersonate()`,
+            sql`SELECT impersonate_user_id FROM auth.sessions WHERE user_id=1`
+        ]);
+        expect(
+            result.at(-4)[0].impersonate.status_code
+        ).toBe(200);
+        expect(
+            result.at(-3)[0].impersonate_user_id
+        ).toBe(2);
+        expect(
+            result.at(-1)[0].impersonate_user_id
+        ).toBe(null);
+        sql.end();
+    });
+});
