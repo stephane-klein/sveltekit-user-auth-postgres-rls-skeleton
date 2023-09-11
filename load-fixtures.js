@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 async function main(sql) {
     const data = yaml.load(fs.readFileSync(path.resolve(__dirname, "./fixtures.yaml"), "utf8"));
 
-    await sql`TRUNCATE auth.users, auth.sessions, auth.invitations, auth.spaces, auth.space_users, main.resource_a, main.resource_b`;
+    await sql`TRUNCATE auth.users, auth.sessions, auth.space_invitations, auth.invitations, auth.spaces, auth.space_users, main.resource_a, main.resource_b`;
     await sql`
         ALTER SEQUENCE auth.invitations_id_seq RESTART WITH 1;
         ALTER SEQUENCE auth.spaces_id_seq RESTART WITH 1;
@@ -89,35 +89,37 @@ async function main(sql) {
                 expiresIn: "7d"
             }
         );
-        await sql`
+        const invitation_id = (await sql`
             INSERT INTO auth.invitations
-            (
-                email,
-                invited_by,
-                spaces,
-                token
-            )
-            (
-                SELECT
-                    ${invite.email} AS email,
-                    ${invite.invited_by} AS invited_by,
-                    JSONB_AGG(ROW_TO_JSON(foo)) AS spaces,
-                    ${token} AS token
-                FROM (
-                    SELECT
-                        spaces.id AS id,
-                        role AS role
-                    FROM
-                        JSONB_TO_RECORDSET(${invite.spaces})
-                        AS list(
-                            slug VARCHAR,
-                            role VARCHAR
-                        )
-                    LEFT JOIN auth.spaces
-                    ON spaces.slug = list.slug
-                ) AS foo
-            )
-        `;
+            ${
+                sql({
+                    "email": invite.email,
+                    "invited_by": invite.invited_by,
+                    "token": token
+                })
+            } RETURNING id
+        `)[0].id;
+
+        for await (const space_invitation of invite.spaces) {
+            console.log(space_invitation);
+            await sql`
+                INSERT INTO auth.space_invitations
+                (
+                    invitation_id,
+                    space_id,
+                    role
+                )
+                VALUES(
+                    ${invitation_id},
+                    (
+                        SELECT id
+                        FROM auth.spaces
+                        WHERE slug=${space_invitation.slug}
+                    ),
+                    ${space_invitation.role}
+                )
+            `;
+        };
     }
 
     for await (const resource_a of data.resource_a) {

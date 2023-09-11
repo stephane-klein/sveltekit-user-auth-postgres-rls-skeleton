@@ -1,4 +1,5 @@
 export async function load({locals}) {
+    console.log(locals.client.current_space.id);
     return {
         invitations: (
             await locals.sql`

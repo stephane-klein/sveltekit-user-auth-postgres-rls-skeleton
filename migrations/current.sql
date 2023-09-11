@@ -176,37 +176,6 @@ BEGIN
 END;
 $$;
 
-DROP TABLE IF EXISTS auth.invitations CASCADE;
-CREATE TABLE auth.invitations (
-    id          SERIAL PRIMARY KEY,
-    invited_by  INTEGER DEFAULT NULL,
-    spaces      JSONB DEFAULT NULL,
-                /*
-                    Example:
-                    [
-                        {
-                            "id": 1,
-                            "role": "space.MEMBER"
-                        },
-                        {
-                            "id": 2,
-                            "role": "space.ADMIN"
-                        }
-                    ]
-                */
-    email       VARCHAR(360) DEFAULT NULL,
-    token       TEXT,
-    expires     TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + '7days'::interval),
-    user_id     INTEGER DEFAULT NULL,
-
-    CONSTRAINT fk_invited_by FOREIGN KEY (invited_by) REFERENCES auth.users (id) ON DELETE CASCADE,
-    CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
-);
-CREATE INDEX invitations_invited_by_index ON auth.invitations (invited_by);
-CREATE INDEX invitations_email_index ON auth.invitations (email);
-CREATE INDEX invitations_token_index ON auth.invitations (token);
-CREATE INDEX invitations_user_id_index ON auth.invitations (user_id);
-
 DROP TABLE IF EXISTS auth.spaces CASCADE;
 CREATE TABLE auth.spaces (
     id                SERIAL PRIMARY KEY,
@@ -254,6 +223,33 @@ CREATE INDEX space_users_space_id_index ON auth.space_users (space_id);
 CREATE INDEX space_users_role_index ON auth.space_users (role);
 CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
+
+DROP TABLE IF EXISTS auth.invitations CASCADE;
+CREATE TABLE auth.invitations (
+    id          SERIAL PRIMARY KEY,
+    invited_by  INTEGER DEFAULT NULL,
+    email       VARCHAR(360) DEFAULT NULL,
+    token       TEXT,
+    expires     TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + '7days'::interval),
+    user_id     INTEGER DEFAULT NULL,
+
+    CONSTRAINT fk_invited_by FOREIGN KEY (invited_by) REFERENCES auth.users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
+);
+CREATE INDEX invitations_invited_by_index ON auth.invitations (invited_by);
+CREATE INDEX invitations_email_index ON auth.invitations (email);
+CREATE INDEX invitations_token_index ON auth.invitations (token);
+CREATE INDEX invitations_user_id_index ON auth.invitations (user_id);
+
+DROP TABLE IF EXISTS auth.space_invitations CASCADE;
+CREATE TABLE auth.space_invitations (
+    invitation_id  INTEGER NOT NULL REFERENCES auth.invitations(id),
+    space_id       INTEGER NOT NULL REFERENCES auth.spaces(id),
+    role           auth.roles NOT NULL
+);
+CREATE INDEX space_invitations_invitation_id_index ON auth.space_invitations (invitation_id);
+CREATE INDEX space_invitations_space_id_index ON auth.space_invitations (space_id);
+CREATE INDEX space_invitations_role_index ON auth.space_invitations (role);
 
 DROP FUNCTION IF EXISTS auth.open_session;
 CREATE FUNCTION auth.open_session(_session_id UUID) RETURNS JSONB
@@ -575,6 +571,26 @@ CREATE POLICY user_read
                 )
         )
     );
+
+    /*
+CREATE POLICY invisation_read
+    ON auth.invitations
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        spaces @>  = ANY(
+            SELECT user_id
+            FROM auth.space_users
+            WHERE
+                space_id = ANY(
+                    REGEXP_SPLIT_TO_ARRAY(
+                        CURRENT_SETTING('auth.spaces', TRUE),
+                        ','
+                    )::INTEGER[]
+                )
+        )
+    );*/
 
 CREATE POLICY resource_a_read
     ON main.resource_a
