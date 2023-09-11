@@ -19,19 +19,28 @@ export const actions = {
         );
 
         await locals.sql`
-            INSERT INTO auth.invitations ${
-                locals.sql({
-                    invited_by: locals.client.user.id,
-                    email: data.get("email"),
-                    token: token,
-                    spaces: [
-                        {
-                            "id": locals.client.current_space.id,
-                            "role": "space.MEMBER"
-                        }
-                    ]
-                })
-            }
+            WITH _invitation AS (
+                INSERT INTO auth.invitations
+                ${
+                    sql({
+                        "invited_by": locals.client.user.id,
+                        "email": data.get("email"),
+                        "token": token,
+                    })
+                }
+                RETURNING id
+            )
+            INSERT INTO auth.space_invitations
+            (
+                invitation_id,
+                space_id,
+                role
+            )
+            VALUES(
+                (SELECT id FROM _invitation),
+                ${locals.client.current_space.id},
+                "space.MEMBER"
+            )
         `;
 
         const invitationUrl = new URL(request.url);

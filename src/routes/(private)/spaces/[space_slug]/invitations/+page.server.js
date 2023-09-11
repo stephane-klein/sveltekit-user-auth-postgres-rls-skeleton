@@ -11,12 +11,15 @@ export async function load({locals}) {
                     users.last_name                            AS invited_by_last_name,
                     invitations.email                          AS email,
                     TO_CHAR(invitations.expires, 'YYYY-MM-dd') AS expires_at
-                FROM auth.invitations
+                FROM auth.space_invitations
+
+                INNER JOIN auth.invitations
+                        ON space_invitations.invitation_id = invitations.id
 
                 LEFT JOIN auth.users
                        ON invitations.invited_by = users.id
 
-                WHERE spaces @> ${[{id: locals.client.current_space.id}]}
+                WHERE space_invitations.space_id = ${locals.client.current_space.id}
 
                 ORDER BY invitations.expires
             `
