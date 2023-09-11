@@ -301,24 +301,31 @@ BEGIN
     SELECT
         JSON_BUILD_OBJECT(
             'user', (
-                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
-                    (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user)
-                ELSE
-                    (SELECT ROW_TO_JSON(_user) FROM _user)
+                CASE
+                    WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                        (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user)
+                    WHEN ((SELECT COUNT(*) FROM _user) > 0) THEN
+                        (SELECT ROW_TO_JSON(_user) FROM _user)
+                    ELSE
+                        NULL
                 END
             ),
             'impersonated_by', (
-                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
-                    (SELECT ROW_TO_JSON(_user) FROM _user)
-                ELSE
-                    NULL
+                CASE
+                    WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                        (SELECT ROW_TO_JSON(_user) FROM _user)
+                    ELSE
+                        NULL
                 END
             ),
             'spaces', (
-                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
-                    (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _impersonate_user LIMIT 1))
-                ELSE
-                    (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _user LIMIT 1))
+                CASE
+                    WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                        (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _impersonate_user LIMIT 1))
+                    WHEN ((SELECT COUNT(*) FROM _user) > 0) THEN
+                        (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _user LIMIT 1))
+                    ELSE
+                        NULL
                 END
             )
         ) INTO _response
@@ -337,11 +344,18 @@ BEGIN
         ),
         SET_CONFIG(
             'auth.spaces',
-            ARRAY_TO_STRING(
-                ARRAY(
-                    SELECT JSONB_ARRAY_ELEMENTS(_response->'spaces')
-                ),
-                ','
+            (
+                CASE
+                    WHEN _response->>'spaces' IS NULL THEN
+                        ''
+                    ELSE
+                        ARRAY_TO_STRING(
+                            ARRAY(
+                                SELECT JSONB_ARRAY_ELEMENTS(_response->'spaces')
+                            ),
+                            ','
+                        )
+                END
             ),
             FALSE
         );
@@ -572,25 +586,42 @@ CREATE POLICY user_read
         )
     );
 
-    /*
+CREATE POLICY space_invitation_read
+    ON auth.space_invitations
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        space_id = ANY(
+            REGEXP_SPLIT_TO_ARRAY(
+                CURRENT_SETTING('auth.spaces', TRUE),
+                ','
+            )::INTEGER[]
+        )
+    );
+
 CREATE POLICY invisation_read
     ON auth.invitations
     AS PERMISSIVE
     FOR SELECT
     TO application_user
     USING(
-        spaces @>  = ANY(
-            SELECT user_id
-            FROM auth.space_users
+        exists(
+            SELECT *
+            FROM auth.space_invitations
             WHERE
-                space_id = ANY(
-                    REGEXP_SPLIT_TO_ARRAY(
-                        CURRENT_SETTING('auth.spaces', TRUE),
-                        ','
-                    )::INTEGER[]
+                (
+                    space_id = ANY(
+                        REGEXP_SPLIT_TO_ARRAY(
+                            CURRENT_SETTING('auth.spaces', TRUE),
+                            ','
+                        )::INTEGER[]
+                    )
+                ) AND (
+                    space_invitations.invitation_id = invitations.id
                 )
         )
-    );*/
+    );
 
 CREATE POLICY resource_a_read
     ON main.resource_a
