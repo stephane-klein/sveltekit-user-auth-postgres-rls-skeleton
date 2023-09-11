@@ -256,18 +256,80 @@ CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
 
 DROP FUNCTION IF EXISTS auth.open_session;
-CREATE FUNCTION auth.open_session(session_id UUID) RETURNS VOID
-LANGUAGE sql SECURITY DEFINER
+CREATE FUNCTION auth.open_session(_session_id UUID) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
+DECLARE
+    _response JSON;
+BEGIN
+    WITH _user AS (
+        SELECT
+            users.id,
+            users.username,
+            users.first_name,
+            users.last_name,
+            users.email,
+            users.is_active,
+            users.last_login,
+            users.date_joined,
+            users.created_at,
+            users.updated_at
+        FROM
+            auth.sessions
+        INNER JOIN auth.users
+            ON sessions.user_id = users.id
+        WHERE
+            sessions.id=_session_id
+        LIMIT 1
+    ),
+    _impersonate_user AS (
+        SELECT
+            users.id,
+            users.username,
+            users.first_name,
+            users.last_name,
+            users.email,
+            users.is_active,
+            users.last_login,
+            users.date_joined,
+            users.created_at,
+            users.updated_at
+        FROM
+            auth.sessions
+        INNER JOIN auth.users
+            ON sessions.impersonate_user_id = users.id
+        WHERE
+            sessions.id=_session_id
+        LIMIT 1
+    )
     SELECT
+        JSON_BUILD_OBJECT(
+            'user', (
+                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                    (SELECT ROW_TO_JSON(_impersonate_user) FROM _impersonate_user)
+                ELSE
+                    (SELECT ROW_TO_JSON(_user) FROM _user)
+                END
+            ),
+            'impersonated_by', (
+                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                    (SELECT ROW_TO_JSON(_user) FROM _user)
+                ELSE
+                    NULL
+                END
+            )
+        ) INTO _response
+    ;
+
+    PERFORM
         SET_CONFIG(
             'auth.session_id',
-            session_id::VARCHAR,
+            _session_id::VARCHAR,
             FALSE
         ),
         SET_CONFIG(
             'auth.user_id',
-            sessions.user_id::VARCHAR,
+            _response->'user'->>'id'::VARCHAR,
             FALSE
         ),
         SET_CONFIG(
@@ -278,8 +340,11 @@ AS $$
         FROM auth.sessions
         LEFT JOIN auth.space_users
                ON sessions.user_id = space_users.user_id
-        WHERE sessions.id=session_id
-        GROUP BY sessions.user_id;
+        WHERE sessions.id=_session_id
+        GROUP BY sessions.id;
+
+    RETURN _response;
+END;
 $$;
 
 DROP FUNCTION IF EXISTS auth.close_session;

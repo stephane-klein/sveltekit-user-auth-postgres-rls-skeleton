@@ -14,25 +14,49 @@ afterAll(() => {
 });
 
 describe("When session is open", () => {
-    it("User must be able to read sessions informations", async() => {
+    beforeAll(async() => {
         sql = postgres(
             "postgres://webapp:password@localhost:5433/myapp"
         );
         await fixture(sqlFixture);
-        const result = await sql.begin((sql) => [
-            sql`SELECT auth.open_session(
+    });
+    afterAll(async() => {
+        sql.end();
+    });
+    it("User must be able to read sessions informations", async() => {
+        let result = await sql`
+            SELECT auth.open_session(
                     (SELECT auth.authenticate(
                         input_username := 'john-doe1',
                         input_email := NULL,
                         input_password := 'secret1'
                     ) ->> 'session_id')::UUID
-            )`,
-            sql`SELECT user_id FROM auth.sessions`
-        ]);
+            )
+        `;
         expect(
-            result.at(-1)[0].user_id
+            result[0].open_session.user.id
         ).toBe(1);
-        sql.end();
+        expect(
+            result[0].open_session.impersonated_by
+        ).toBe(null);
+
+        result = await sql`
+            SELECT
+                CURRENT_SETTING('auth.session_id', TRUE) AS session_id,
+                CURRENT_SETTING('auth.user_id', TRUE)::INTEGER AS user_id,
+                CURRENT_SETTING('auth.spaces', TRUE) AS spaces;
+        `;
+        expect(
+            result[0].user_id
+        ).toBe(1);
+        expect(
+            result[0].spaces
+        ).toBe("1,2,3,4");
+
+        result = await sql`SELECT user_id FROM auth.sessions`;
+        expect(
+            result[0].user_id
+        ).toBe(1);
     });
 });
 
@@ -170,4 +194,4 @@ describe("When admin john-doe1 is connected", () => {
         ).toBe(null);
         sql.end();
     });
-});
+})
