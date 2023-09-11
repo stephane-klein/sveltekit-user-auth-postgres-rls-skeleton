@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 
-export async function GET({locals, params, url}) {
+export async function load({locals, params, url}) {
     const result = await locals.sql`
         SELECT auth.impersonate(${params.username})
     `;
