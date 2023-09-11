@@ -101,7 +101,6 @@ async function main(sql) {
         `)[0].id;
 
         for await (const space_invitation of invite.spaces) {
-            console.log(space_invitation);
             await sql`
                 INSERT INTO auth.space_invitations
                 (
