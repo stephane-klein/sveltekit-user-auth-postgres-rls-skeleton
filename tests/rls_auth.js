@@ -175,28 +175,44 @@ describe("When admin john-doe1 is connected", () => {
             "postgres://webapp:password@localhost:5433/myapp"
         );
         await fixture(sqlFixture);
-        const result = await sql.begin((sql) => [
-            sql`SELECT auth.open_session(
-                    (SELECT auth.authenticate(
-                        input_username := 'john-doe1',
-                        input_email := NULL,
-                        input_password := 'secret1'
-                    ) ->> 'session_id')::UUID
-            )`,
-            sql`SELECT auth.impersonate('john-doe2')`,
-            sql`SELECT impersonate_user_id FROM auth.sessions WHERE user_id=1`,
-            sql`SELECT auth.exit_impersonate()`,
-            sql`SELECT impersonate_user_id FROM auth.sessions WHERE user_id=1`
-        ]);
+        const sessionId = (await sql`
+            SELECT (auth.authenticate(
+                input_username := 'john-doe1',
+                input_email := NULL,
+                input_password := 'secret1'
+            ) ->> 'session_id')::UUID AS session_id
+        `)[0].session_id;
+
+        let openSessionResult = (await sql`SELECT auth.open_session(${sessionId})`)[0].open_session;
+        expect(openSessionResult.user.id).toBe(1);
+        expect(openSessionResult.impersonated_by).toBe(null);
+        expect(openSessionResult.spaces).toMatchObject([ 1, 2, 3, 4]);
+
         expect(
-            result.at(-4)[0].impersonate.status_code
+            (await sql`SELECT CURRENT_SETTING('auth.spaces') AS spaces`)[0].spaces
+        ).toBe("1,2,3,4");
+        expect(
+            (await sql`SELECT auth.impersonate('john-doe2')`)[0].impersonate.status_code
         ).toBe(200);
+
+        openSessionResult = (await sql`SELECT auth.open_session(${sessionId})`)[0].open_session;
+        expect(openSessionResult.user.id).toBe(2);
+        expect(openSessionResult.impersonated_by.id).toBe(1);
+        expect(openSessionResult.spaces).toMatchObject([ 1 ]);
         expect(
-            result.at(-3)[0].impersonate_user_id
-        ).toBe(2);
+            (await sql`SELECT CURRENT_SETTING('auth.spaces') AS spaces`)[0].spaces
+        ).toBe("1");
+
+        await sql`SELECT auth.exit_impersonate()`;
+
+        openSessionResult = (await sql`SELECT auth.open_session(${sessionId})`)[0].open_session;
+        expect(openSessionResult.user.id).toBe(1);
+        expect(openSessionResult.impersonated_by).toBe(null);
+        expect(openSessionResult.spaces).toMatchObject([ 1, 2, 3, 4]);
         expect(
-            result.at(-1)[0].impersonate_user_id
-        ).toBe(null);
+            (await sql`SELECT CURRENT_SETTING('auth.spaces') AS spaces`)[0].spaces
+        ).toBe("1,2,3,4");
+
         sql.end();
     });
 });
