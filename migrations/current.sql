@@ -256,11 +256,11 @@ CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
 
 DROP FUNCTION IF EXISTS auth.open_session;
-CREATE FUNCTION auth.open_session(_session_id UUID) RETURNS JSON
+CREATE FUNCTION auth.open_session(_session_id UUID) RETURNS JSONB
 LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
 DECLARE
-    _response JSON;
+    _response JSONB;
 BEGIN
     WITH _user AS (
         SELECT
@@ -317,6 +317,13 @@ BEGIN
                 ELSE
                     NULL
                 END
+            ),
+            'spaces', (
+                CASE WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                    (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _impersonate_user LIMIT 1))
+                ELSE
+                    (SELECT ARRAY_AGG(space_id) FROM auth.space_users WHERE user_id = (SELECT id FROM _user LIMIT 1))
+                END
             )
         ) INTO _response
     ;
@@ -334,14 +341,14 @@ BEGIN
         ),
         SET_CONFIG(
             'auth.spaces',
-            ARRAY_TO_STRING(ARRAY_AGG(space_id), ','),
+            ARRAY_TO_STRING(
+                ARRAY(
+                    SELECT JSONB_ARRAY_ELEMENTS(_response->'spaces')
+                ),
+                ','
+            ),
             FALSE
-        )
-        FROM auth.sessions
-        LEFT JOIN auth.space_users
-               ON sessions.user_id = space_users.user_id
-        WHERE sessions.id=_session_id
-        GROUP BY sessions.id;
+        );
 
     RETURN _response;
 END;

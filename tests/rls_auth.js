@@ -33,12 +33,16 @@ describe("When session is open", () => {
                     ) ->> 'session_id')::UUID
             )
         `;
+        // console.dir(result, { depth: null});
         expect(
             result[0].open_session.user.id
         ).toBe(1);
         expect(
             result[0].open_session.impersonated_by
         ).toBe(null);
+        expect(
+            result[0].open_session.spaces
+        ).toMatchObject([1, 2, 3, 4]);
 
         result = await sql`
             SELECT
@@ -46,6 +50,7 @@ describe("When session is open", () => {
                 CURRENT_SETTING('auth.user_id', TRUE)::INTEGER AS user_id,
                 CURRENT_SETTING('auth.spaces', TRUE) AS spaces;
         `;
+        // console.log(result[0]);
         expect(
             result[0].user_id
         ).toBe(1);
@@ -194,4 +199,4 @@ describe("When admin john-doe1 is connected", () => {
         ).toBe(null);
         sql.end();
     });
-})
+});
