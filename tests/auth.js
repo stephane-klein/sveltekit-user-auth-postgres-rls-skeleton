@@ -12,6 +12,8 @@ afterAll(() => {
 });
 
 test("Create a user and login", async() => {
+    await sql`DELETE FROM auth.space_invitations CASCADE`;
+    await sql`DELETE FROM auth.invitations CASCADE`;
     await sql`DELETE FROM auth.space_users CASCADE`;
     await sql`DELETE FROM auth.users CASCADE`;
     await sql`DELETE FROM auth.sessions CASCADE`;
