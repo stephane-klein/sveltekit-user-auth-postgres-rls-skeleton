@@ -27,11 +27,21 @@ export async function load({ locals, url }) {
             email: invitation.email,
             token: url.searchParams.get("token")
         };
-    } else if (process.env.INVITATION_REQUIRED === "1") {
-        return {
-            invitation_required: true
-        };
     }
+
+    return {
+        spaces: await locals.sql`
+            SELECT
+                slug,
+                title
+            FROM
+                auth.spaces
+            WHERE
+                is_publicly_browsable IS TRUE
+            ORDER BY
+                created_at
+        `
+    };
 }
 
 export const actions = {
