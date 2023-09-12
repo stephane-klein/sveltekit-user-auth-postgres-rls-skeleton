@@ -11,6 +11,14 @@
     <form method="POST">
         {#if form?.error}<p class="error">{form.error}</p>{/if}
         <div>
+            <label for="space">Space:</label>
+            <select id="space" name="space">
+                {#each data.spaces as space}
+                    <option value={space.slug}>{space.title}</option>
+                {/each}
+            </select>
+        </div>
+        <div>
             <label for="email">Email:</label>
             <input
                 id="email"

@@ -22,7 +22,7 @@ export const actions = {
             WITH _invitation AS (
                 INSERT INTO auth.invitations
                 ${
-                    sql({
+                    locals.sql({
                         "invited_by": locals.client.user.id,
                         "email": data.get("email"),
                         "token": token,
@@ -39,7 +39,7 @@ export const actions = {
             VALUES(
                 (SELECT id FROM _invitation),
                 ${locals.client.current_space.id},
-                "space.MEMBER"
+                'space.MEMBER'
             )
         `;
 

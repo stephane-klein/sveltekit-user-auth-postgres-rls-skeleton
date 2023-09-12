@@ -26,11 +26,11 @@ describe("When session is open", () => {
     it("User must be able to read sessions informations", async() => {
         let result = await sql`
             SELECT auth.open_session(
-                    (SELECT auth.authenticate(
-                        input_username := 'john-doe1',
-                        input_email := NULL,
-                        input_password := 'secret1'
-                    ) ->> 'session_id')::UUID
+                (SELECT auth.authenticate(
+                    input_username := 'john-doe1',
+                    input_email := NULL,
+                    input_password := 'secret1'
+                ) ->> 'session_id')::UUID
             )
         `;
         // console.dir(result, { depth: null});
@@ -218,16 +218,65 @@ describe("When admin john-doe1 is connected", () => {
 });
 
 describe("Anonymous user is connected", () => {
-    it("Anonymous should be able to list is_publicly_browsable spaces", async() => {
+    beforeAll(async() => {
         sql = postgres(
             "postgres://webapp:password@localhost:5433/myapp"
         );
         await fixture(sqlFixture);
+    });
 
+    afterAll(async() => {
+        sql.end();
+    });
+
+    it("Anonymous should be able to list is_publicly_browsable spaces", async() => {
         expect(
             (await sql`SELECT COUNT(*)::INTEGER FROM auth.spaces`)[0].count
         ).toBe(3);
+    });
 
-        sql.end();
+    it("Anonymous should be able to create a user", async() => {
+        const result = (await sql`SELECT auth.create_user(
+            _id         => null,
+            _username   => 'john-doe-created',
+            _first_name => 'John',
+            _last_name  => 'Doe',
+            _email      => 'john.doe-created@example.com',
+            _password   => 'mysecret',
+            _is_active  => true,
+            _spaces     => '[{"slug": "space-1", "role": "space.MEMBER"}]'
+        )`)[0].create_user;
+        expect(result.status_code).toBe(200);
+        expect(result.user_id).toBe(5);
+    });
+
+    it("Anonymous should be able to create_user with invitation", async() => {
+        let result = (await sql`SELECT auth.create_user_from_invitation(
+            _id             => null,
+            _invitation_id  => 1,
+            _username       => 'invited_user1',
+            _first_name     => 'Alice',
+            _last_name      => 'Doe',
+            _email          => 'alice.doe@example.com',
+            _password       => 'secret',
+            _is_active      => true
+        )`)[0].create_user_from_invitation;
+        expect(result.status_code).toBe(200);
+        expect(result.user_id).toBe(6);
+
+        const invitations = await sqlFixture`SELECT * FROM auth.invitations WHERE id=1`;
+        expect(invitations[0].user_id).toBe(result.user_id);
+
+        result = (await sql`SELECT auth.create_user_from_invitation(
+            _id             => null,
+            _invitation_id  => 1,
+            _username       => 'invited_user1',
+            _first_name     => 'Alice',
+            _last_name      => 'Doe',
+            _email          => 'alice.doe@example.com',
+            _password       => 'secret',
+            _is_active      => true
+        )`)[0].create_user_from_invitation;
+        expect(result.status_code).toBe(401);
     });
 });

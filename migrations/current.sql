@@ -30,11 +30,11 @@ CREATE SCHEMA IF NOT EXISTS auth;
 DROP TABLE IF EXISTS auth.users CASCADE;
 CREATE TABLE auth.users (
     id                     SERIAL PRIMARY KEY,
-    username               VARCHAR(100) NULL UNIQUE,
+    username               VARCHAR(100) NOT NULL UNIQUE,
     first_name             VARCHAR(150) DEFAULT NULL,
     last_name              VARCHAR(150) DEFAULT NULL,
-    email                  VARCHAR(360) DEFAULT NULL,
-    password               VARCHAR(255) DEFAULT NULL,
+    email                  VARCHAR(360) NOT NULL UNIQUE,
+    password               VARCHAR(255) NOT NULL,
     is_active              BOOLEAN DEFAULT false,
     last_login             TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     date_joined            TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -195,17 +195,54 @@ CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
 
 DROP FUNCTION IF EXISTS auth.create_user;
 CREATE FUNCTION auth.create_user(
-    id                     INTEGER,
-    username               VARCHAR(100),
-    first_name             VARCHAR(150),
-    last_name              VARCHAR(150),
-    email                  VARCHAR(360),
-    password               VARCHAR(255),
-    is_active              BOOLEAN,
-    spaces                 JSONB
-) RETURNS INTEGER
-LANGUAGE sql
+    _id                    INTEGER,
+    _username              VARCHAR(100),
+    _first_name            VARCHAR(150),
+    _last_name             VARCHAR(150),
+    _email                 VARCHAR(360),
+    _password              VARCHAR(255),
+    _is_active             BOOLEAN,
+    _spaces                JSONB
+) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
+DECLARE
+    _response JSON;
+BEGIN
+    IF (
+        (SESSION_USER = 'webapp') AND
+        (_spaces IS NULL)
+    ) THEN
+        SELECT json_build_object(
+            'status_code', 401,
+            'status', 'space parameter must not be empty'
+        ) INTO _response;
+
+        RETURN _response;
+    END IF;
+    IF (
+        (SESSION_USER = 'webapp') AND  -- TODO webapp is a bad hack, must be refactored
+        (
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
+                INNER JOIN auth.spaces
+                        ON _space_records.slug = spaces.slug
+                WHERE
+                    spaces.invitation_required = FALSE
+            ) = 0
+        )
+    ) THEN
+        SELECT json_build_object(
+            'status_code', 401,
+            'status', 'Spaces do not exists or invitation required'
+        ) INTO _response;
+
+        RETURN _response;
+    END IF;
+
     WITH _user AS (
         INSERT INTO auth.users
         (
@@ -218,13 +255,13 @@ AS $$
             is_active
         )
         VALUES(
-            COALESCE(id, NEXTVAL('auth.users_id_seq')),
-            TRIM(username),
-            TRIM(first_name),
-            TRIM(last_name),
-            LOWER(TRIM(email)),
-            utils.CRYPT(TRIM(password), utils.GEN_SALT('bf', 8)),
-            is_active
+            COALESCE(_id, NEXTVAL('auth.users_id_seq')),
+            TRIM(_username),
+            TRIM(_first_name),
+            TRIM(_last_name),
+            LOWER(TRIM(_email)),
+            utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8)),
+            _is_active
         ) RETURNING id
     ),
     _space_users AS (
@@ -237,13 +274,27 @@ AS $$
         SELECT
             (SELECT id FROM _user LIMIT 1) AS user_id,
             spaces.id AS space_id,
-            _spaces.role AS role
+            _space_records.role AS role
         FROM
-            JSONB_TO_RECORDSET(spaces) AS _spaces(slug VARCHAR, role auth.roles)
+            JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
         INNER JOIN auth.spaces
-                ON _spaces.slug = spaces.slug
+                ON _space_records.slug = spaces.slug
+        WHERE
+            (SESSION_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
+            (spaces.invitation_required = FALSE)
     )
-    SELECT id FROM _user;
+    SELECT json_build_object(
+        'status_code', 200,
+        'status', 'User created with success',
+        'user_id', (SELECT id FROM _user LIMIT 1)
+    ) INTO _response;
+
+    IF ((_response->>'user_id')::INTEGER > (SELECT COALESCE(pg_sequence_last_value('auth.users_id_seq'), 0))) THEN
+        PERFORM SETVAL('auth.users_id_seq', (_response->>'user_id')::INTEGER, TRUE);
+    END IF;
+
+    RETURN _response;
+END;
 $$;
 
 DROP TABLE IF EXISTS auth.invitations CASCADE;
@@ -272,6 +323,113 @@ CREATE TABLE auth.space_invitations (
 CREATE INDEX space_invitations_invitation_id_index ON auth.space_invitations (invitation_id);
 CREATE INDEX space_invitations_space_id_index ON auth.space_invitations (space_id);
 CREATE INDEX space_invitations_role_index ON auth.space_invitations (role);
+
+DROP FUNCTION IF EXISTS auth.create_user_from_invitation;
+CREATE FUNCTION auth.create_user_from_invitation(
+    _id              INTEGER,
+    _invitation_id   INTEGER,
+    _username        VARCHAR(100),
+    _first_name      VARCHAR(150),
+    _last_name       VARCHAR(150),
+    _email           VARCHAR(360),
+    _password        VARCHAR(255),
+    _is_active       BOOLEAN
+) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _response JSON;
+    _invitation auth.invitations;
+BEGIN
+    SELECT * INTO _invitation FROM auth.invitations WHERE id=_invitation_id;
+
+    IF (_invitation IS NULL) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 404,
+                'status', 'Invitation not found'
+            ) INTO _response;
+
+        RETURN _response;
+    END IF;
+
+    IF (_invitation.expires < NOW()) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 401,
+                'status', 'Invitation expired'
+            ) INTO _response;
+
+        RETURN _response;
+    END IF;
+
+    IF (_invitation.user_id IS NOT NULL) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 401,
+                'status', 'Invitation already used'
+            ) INTO _response;
+
+        RETURN _response;
+    END IF;
+
+    WITH _user AS (
+        INSERT INTO auth.users
+        (
+            id,
+            username,
+            first_name,
+            last_name,
+            email,
+            password,
+            is_active
+        )
+        VALUES(
+            COALESCE(_id, NEXTVAL('auth.users_id_seq')),
+            TRIM(_username),
+            TRIM(_first_name),
+            TRIM(_last_name),
+            LOWER(TRIM(_email)),
+            utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8)),
+            _is_active
+        ) RETURNING id
+    ),
+    _space_users AS (
+        INSERT INTO auth.space_users
+        (
+            user_id,
+            space_id,
+            role
+        )
+        SELECT
+            (SELECT id FROM _user LIMIT 1) AS user_id,
+            space_invitations.space_id     AS space_id,
+            space_invitations.role          AS role
+        FROM
+            auth.space_invitations
+        WHERE
+            space_invitations.invitation_id=_invitation_id
+    ),
+    _update_invitation AS (
+        UPDATE auth.invitations
+           SET user_id=(SELECT id FROM _user LIMIT 1)
+         WHERE id=_invitation_id
+    )
+    SELECT
+        JSON_BUILD_OBJECT(
+            'status_code', 200,
+            'status', 'Use created',
+            'user_id', (SELECT id FROM _user LIMIT 1)
+        ) INTO _response;
+
+    IF ((_response->>'user_id')::INTEGER > (SELECT COALESCE(pg_sequence_last_value('auth.users_id_seq'), 0))) THEN
+        PERFORM SETVAL('auth.users_id_seq', (_response->>'user_id')::INTEGER, TRUE);
+    END IF;
+
+    RETURN _response;
+END;
+$$;
+
 
 DROP FUNCTION IF EXISTS auth.open_session;
 CREATE FUNCTION auth.open_session(_session_id UUID) RETURNS JSONB
@@ -436,7 +594,7 @@ BEGIN
         RETURN (
             SELECT json_build_object(
                 'status_code', 401,
-                'status', 'Either the user ' || _username ||'does not exist, or you are not authorized to play him.'
+                'status', 'Either the user ' || _username || 'does not exist, or you are not authorized to play him.'
             )
         );
     ELSE
