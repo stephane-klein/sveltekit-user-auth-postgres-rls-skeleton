@@ -533,13 +533,14 @@ ALTER TABLE auth.space_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
 
+
 CREATE POLICY session_read
     ON auth.sessions
     AS PERMISSIVE
     FOR SELECT
     TO application_user
     USING(
-        user_id = CURRENT_SETTING('auth.user_id', TRUE)::INTEGER
+        user_id = NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER
     );
 
 CREATE POLICY space_read
@@ -552,11 +553,11 @@ CREATE POLICY space_read
         (
             id = ANY(
                 REGEXP_SPLIT_TO_ARRAY(
-                    CURRENT_SETTING('auth.spaces', TRUE),
+                    NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                     ','
                 )::INTEGER[]
             )
-    )
+        )
     );
 
 CREATE POLICY space_users_read
@@ -567,7 +568,7 @@ CREATE POLICY space_users_read
     USING(
         space_id = ANY(
             REGEXP_SPLIT_TO_ARRAY(
-                CURRENT_SETTING('auth.spaces', TRUE),
+                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                 ','
             )::INTEGER[]
         )
@@ -585,7 +586,7 @@ CREATE POLICY user_read
             WHERE
                 space_id = ANY(
                     REGEXP_SPLIT_TO_ARRAY(
-                        CURRENT_SETTING('auth.spaces', TRUE),
+                        NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                         ','
                     )::INTEGER[]
                 )
@@ -600,7 +601,7 @@ CREATE POLICY space_invitation_read
     USING(
         space_id = ANY(
             REGEXP_SPLIT_TO_ARRAY(
-                CURRENT_SETTING('auth.spaces', TRUE),
+                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                 ','
             )::INTEGER[]
         )
@@ -619,7 +620,7 @@ CREATE POLICY invisation_read
                 (
                     space_id = ANY(
                         REGEXP_SPLIT_TO_ARRAY(
-                            CURRENT_SETTING('auth.spaces', TRUE),
+                            NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                             ','
                         )::INTEGER[]
                     )
@@ -637,7 +638,7 @@ CREATE POLICY resource_a_read
     USING(
         space_id = ANY(
             REGEXP_SPLIT_TO_ARRAY(
-                CURRENT_SETTING('auth.spaces', TRUE),
+                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
                 ','
             )::INTEGER[]
         )

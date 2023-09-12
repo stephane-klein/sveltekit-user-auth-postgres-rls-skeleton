@@ -47,7 +47,7 @@ describe("When session is open", () => {
         result = await sql`
             SELECT
                 CURRENT_SETTING('auth.session_id', TRUE) AS session_id,
-                CURRENT_SETTING('auth.user_id', TRUE)::INTEGER AS user_id,
+                NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER AS user_id,
                 CURRENT_SETTING('auth.spaces', TRUE) AS spaces;
         `;
         // console.log(result[0]);
@@ -224,9 +224,9 @@ describe("Anonymous user is connected", () => {
         );
         await fixture(sqlFixture);
 
-        const result = await sql`SELECT * FROM auth.spaces`;
-
-        console.log(result);
+        expect(
+            (await sql`SELECT COUNT(*)::INTEGER FROM auth.spaces`)[0].count
+        ).toBe(3);
 
         sql.end();
     });
