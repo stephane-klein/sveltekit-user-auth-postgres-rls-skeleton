@@ -7,3 +7,5 @@
 </p>
 
 <hr />
+
+<a href="/explore/">Explore Spaces</a>

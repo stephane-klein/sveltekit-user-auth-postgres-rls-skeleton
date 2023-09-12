@@ -178,10 +178,12 @@ $$;
 
 DROP TABLE IF EXISTS auth.spaces CASCADE;
 CREATE TABLE auth.spaces (
-    id                SERIAL PRIMARY KEY,
-    parent_space_id   INTEGER DEFAULT NULL,
-    slug              VARCHAR(100) NOT NULL,
-    title             VARCHAR(100) NOT NULL,
+    id                     SERIAL PRIMARY KEY,
+    parent_space_id        INTEGER DEFAULT NULL,
+    slug                   VARCHAR(100) NOT NULL,
+    title                  VARCHAR(100) NOT NULL,
+    is_publicly_browsable  BOOLEAN DEFAULT FALSE,
+    invitation_required    BOOLEAN DEFAULT TRUE,
 
     created_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -194,14 +196,15 @@ CREATE TABLE auth.spaces (
 );
 ALTER TABLE auth.spaces ADD CONSTRAINT spaces_parent_space_id_fkey FOREIGN KEY (parent_space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE;
 
-CREATE INDEX spaces_parent_space_id_index ON auth.spaces (parent_space_id);
-CREATE INDEX spaces_slug_index            ON auth.spaces (slug);
-CREATE INDEX spaces_created_by_index      ON auth.spaces (created_by);
-CREATE INDEX spaces_created_at_index      ON auth.spaces (created_at);
-CREATE INDEX spaces_updated_by_index      ON auth.spaces (updated_by);
-CREATE INDEX spaces_updated_at_index      ON auth.spaces (updated_at);
-CREATE INDEX spaces_deleted_by_index      ON auth.spaces (deleted_by);
-CREATE INDEX spaces_deleted_at_index      ON auth.spaces (deleted_at);
+CREATE INDEX spaces_parent_space_id_index          ON auth.spaces (parent_space_id);
+CREATE INDEX spaces_slug_index                     ON auth.spaces (slug);
+CREATE INDEX spaces_is_publicly_browsable_index    ON auth.spaces (is_publicly_browsable);
+CREATE INDEX spaces_created_by_index               ON auth.spaces (created_by);
+CREATE INDEX spaces_created_at_index               ON auth.spaces (created_at);
+CREATE INDEX spaces_updated_by_index               ON auth.spaces (updated_by);
+CREATE INDEX spaces_updated_at_index               ON auth.spaces (updated_at);
+CREATE INDEX spaces_deleted_by_index               ON auth.spaces (deleted_by);
+CREATE INDEX spaces_deleted_at_index               ON auth.spaces (deleted_at);
 
 DROP TYPE IF EXISTS auth.roles;
 CREATE TYPE auth.roles AS ENUM (
@@ -545,12 +548,15 @@ CREATE POLICY space_read
     FOR SELECT
     TO application_user
     USING(
-        id = ANY(
-            REGEXP_SPLIT_TO_ARRAY(
-                CURRENT_SETTING('auth.spaces', TRUE),
-                ','
-            )::INTEGER[]
-        )
+        (is_publicly_browsable IS TRUE) OR
+        (
+            id = ANY(
+                REGEXP_SPLIT_TO_ARRAY(
+                    CURRENT_SETTING('auth.spaces', TRUE),
+                    ','
+                )::INTEGER[]
+            )
+    )
     );
 
 CREATE POLICY space_users_read

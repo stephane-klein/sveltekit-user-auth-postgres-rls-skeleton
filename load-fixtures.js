@@ -29,7 +29,9 @@ async function main(sql) {
                     sql({
                         "parent_space_id": parent_space_id,
                         "slug": space.slug,
-                        "title": space.title
+                        "title": space.title,
+                        "is_publicly_browsable": space.is_publicly_browsable,
+                        "invitation_required": space.invitation_required
                     })
                 }
                 RETURNING id

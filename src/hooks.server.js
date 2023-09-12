@@ -13,7 +13,7 @@ export async function handle({ event, resolve }) {
         const openSessionResult = (await event.locals.sql`
             SELECT auth.open_session(${sessionId});
         `)[0].open_session;
-        console.log(openSessionResult);
+
         if (openSessionResult.user) {
             event.locals.session_id = sessionId;
             event.locals.client.user = openSessionResult.user;
