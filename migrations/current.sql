@@ -374,17 +374,17 @@ AS $$
     SELECT
         SET_CONFIG(
             'auth.session_id',
-            '',
+            NULL,
             FALSE
         ),
         SET_CONFIG(
             'auth.user_id',
-            '',
+            NULL,
             FALSE
         ),
         SET_CONFIG(
             'auth.spaces',
-            '',
+            NULL,
             FALSE
         );
 $$;

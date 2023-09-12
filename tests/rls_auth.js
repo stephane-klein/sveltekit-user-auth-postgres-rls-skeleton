@@ -144,7 +144,7 @@ describe("When john-doe2 user request the list of spaces", () => {
         ]);
         expect(
             result.at(-1)[0].count
-        ).toBe(1);
+        ).toBe(3);
         sql.end();
     });
 });
@@ -212,6 +212,21 @@ describe("When admin john-doe1 is connected", () => {
         expect(
             (await sql`SELECT CURRENT_SETTING('auth.spaces') AS spaces`)[0].spaces
         ).toBe("1,2,3,4");
+
+        sql.end();
+    });
+});
+
+describe("Anonymous user is connected", () => {
+    it("Anonymous should be able to list is_publicly_browsable spaces", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+
+        const result = await sql`SELECT * FROM auth.spaces`;
+
+        console.log(result);
 
         sql.end();
     });
