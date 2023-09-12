@@ -47,7 +47,7 @@ async function main(sql) {
     await import_spaces(data.spaces, null);
 
     for await (const user of data.users) {
-        const user_id = (await sql`
+        await sql`
             SELECT auth.create_user(
                 id         => ${user?.id || undefined},
                 username   => ${user.username},
@@ -55,29 +55,10 @@ async function main(sql) {
                 last_name  => ${user.last_name},
                 email      => ${user.email},
                 password   => ${user.password},
-                is_active  => TRUE
+                is_active  => TRUE,
+                spaces     => ${user.spaces}
             ) AS user_id;
-        `)[0].user_id;
-
-        for await (const space_user of user.spaces) {
-            await sql`
-                INSERT INTO auth.space_users
-                    (
-                        user_id,
-                        space_id,
-                        role
-                    )
-                    VALUES(
-                        ${user_id},
-                        (
-                            SELECT id
-                            FROM auth.spaces
-                            WHERE slug=${space_user.slug}
-                        ),
-                        ${space_user.role}
-                    )
-            `;
-        }
+        `;
     }
 
     for await (const invite of data.invitations) {

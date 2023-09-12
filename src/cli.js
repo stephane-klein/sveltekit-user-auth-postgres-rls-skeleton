@@ -40,7 +40,8 @@ yargs(hideBin(process.argv))
                             last_name  => ${argv?.lastname || ""},
                             email      => ${argv.email},
                             password   => ${argv.password},
-                            is_active  => true
+                            is_active  => TRUE,
+                            spaces     => NULL
                         );
                     `;
                 } catch (err) {

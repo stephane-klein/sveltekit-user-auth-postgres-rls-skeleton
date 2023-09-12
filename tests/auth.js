@@ -15,6 +15,7 @@ test("Create a user and login", async() => {
     await sql`DELETE FROM auth.space_invitations CASCADE`;
     await sql`DELETE FROM auth.invitations CASCADE`;
     await sql`DELETE FROM auth.space_users CASCADE`;
+    await sql`DELETE FROM auth.spaces CASCADE`;
     await sql`DELETE FROM auth.users CASCADE`;
     await sql`DELETE FROM auth.sessions CASCADE`;
 
@@ -25,7 +26,8 @@ test("Create a user and login", async() => {
         last_name  => 'Doe',
         email      => 'john.doe@example.com',
         password   => 'secret',
-        is_active  => true
+        is_active  => true,
+        spaces => null
     )`)[0]?.create_user;
 
     expect(

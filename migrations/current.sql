@@ -51,40 +51,6 @@ CREATE INDEX users_date_joined_index ON auth.users (date_joined);
 CREATE INDEX users_created_at_index  ON auth.users (created_at);
 CREATE INDEX users_updated_at_index  ON auth.users (updated_at);
 
-DROP FUNCTION IF EXISTS auth.create_user;
-CREATE FUNCTION auth.create_user(
-    id                     INTEGER,
-    username               VARCHAR(100),
-    first_name             VARCHAR(150),
-    last_name              VARCHAR(150),
-    email                  VARCHAR(360),
-    password               VARCHAR(255),
-    is_active              BOOLEAN
-) RETURNS INTEGER
-LANGUAGE sql
-AS $$
-    INSERT INTO auth.users
-    (
-        id,
-        username,
-        first_name,
-        last_name,
-        email,
-        password,
-        is_active
-    )
-    VALUES(
-        COALESCE(id, NEXTVAL('auth.users_id_seq')),
-        TRIM(username),
-        TRIM(first_name),
-        TRIM(last_name),
-        LOWER(TRIM(email)),
-        utils.CRYPT(TRIM(password), utils.GEN_SALT('bf', 8)),
-        is_active
-    )
-    RETURNING id;
-$$;
-
 DROP TABLE IF EXISTS auth.sessions CASCADE;
 CREATE TABLE auth.sessions(
     id                  UUID PRIMARY KEY DEFAULT utils.uuid_generate_v4() NOT NULL,
@@ -226,6 +192,59 @@ CREATE INDEX space_users_space_id_index ON auth.space_users (space_id);
 CREATE INDEX space_users_role_index ON auth.space_users (role);
 CREATE INDEX space_users_created_by_index ON auth.space_users (created_by);
 CREATE INDEX space_users_created_at_index ON auth.space_users (created_at);
+
+DROP FUNCTION IF EXISTS auth.create_user;
+CREATE FUNCTION auth.create_user(
+    id                     INTEGER,
+    username               VARCHAR(100),
+    first_name             VARCHAR(150),
+    last_name              VARCHAR(150),
+    email                  VARCHAR(360),
+    password               VARCHAR(255),
+    is_active              BOOLEAN,
+    spaces                 JSONB
+) RETURNS INTEGER
+LANGUAGE sql
+AS $$
+    WITH _user AS (
+        INSERT INTO auth.users
+        (
+            id,
+            username,
+            first_name,
+            last_name,
+            email,
+            password,
+            is_active
+        )
+        VALUES(
+            COALESCE(id, NEXTVAL('auth.users_id_seq')),
+            TRIM(username),
+            TRIM(first_name),
+            TRIM(last_name),
+            LOWER(TRIM(email)),
+            utils.CRYPT(TRIM(password), utils.GEN_SALT('bf', 8)),
+            is_active
+        ) RETURNING id
+    ),
+    _space_users AS (
+        INSERT INTO auth.space_users
+        (
+            user_id,
+            space_id,
+            role
+        )
+        SELECT
+            (SELECT id FROM _user LIMIT 1) AS user_id,
+            spaces.id AS space_id,
+            _spaces.role AS role
+        FROM
+            JSONB_TO_RECORDSET(spaces) AS _spaces(slug VARCHAR, role auth.roles)
+        INNER JOIN auth.spaces
+                ON _spaces.slug = spaces.slug
+    )
+    SELECT id FROM _user;
+$$;
 
 DROP TABLE IF EXISTS auth.invitations CASCADE;
 CREATE TABLE auth.invitations (
