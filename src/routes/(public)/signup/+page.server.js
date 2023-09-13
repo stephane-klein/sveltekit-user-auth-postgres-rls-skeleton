@@ -35,7 +35,7 @@ export async function load({ locals, url }) {
 }
 
 export const actions = {
-    default: async({ request }) => {
+    default: async({ locals, request }) => {
         const data = await request.formData();
 
         if (
@@ -49,7 +49,7 @@ export const actions = {
 
         let email;
         if (data.get("token")) {
-            const invitation = (await sql`SELECT email, expires FROM auth.invitations WHERE token=${data.get("token")}`)?.[0];
+            const invitation = (await locals.sql`SELECT email, expires FROM auth.invitations WHERE token=${data.get("token")}`)?.[0];
             if (!invitation) {
                 return {
                     error: "Error: invalid invitation token"
@@ -65,7 +65,7 @@ export const actions = {
             email = data.get("email");
         }
 
-        const userId = (await sql`
+        const userId = (await locals.sql`
             SELECT auth.create_user(
                 username   => ${email},
                 first_name => ${data.get("first_name")},
@@ -79,7 +79,7 @@ export const actions = {
         console.log(userId);
 
         if (data.get("token")) {
-            await sql`
+            await locals.sql`
                 UPDATE auth.invitations
                    SET user_id=${userId}
                  WHERE token=${data.get("token")}
