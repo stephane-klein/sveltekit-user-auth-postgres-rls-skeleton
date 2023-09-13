@@ -210,7 +210,7 @@ DECLARE
     _response JSON;
 BEGIN
     IF (
-        (CURRENT_USER != 'postgres') AND
+        (CURRENT_USER = 'webapp') AND  -- TODO webapp is a bad hack, must be refactored
         (
             SELECT
                 COUNT(*)
@@ -267,7 +267,7 @@ BEGIN
         INNER JOIN auth.spaces
                 ON _space_records.slug = spaces.slug
         WHERE
-            (CURRENT_USER = 'postgres') OR
+            (CURRENT_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
             (spaces.invitation_required = FALSE)
     )
     SELECT json_build_object(
@@ -275,6 +275,10 @@ BEGIN
         'status', 'User created with success',
         'user_id', (SELECT id FROM _user LIMIT 1)
     ) INTO _response;
+
+    IF ((_response->>'user_id')::INTEGER > (SELECT COALESCE(pg_sequence_last_value('auth.users_id_seq'), 0))) THEN
+        PERFORM SETVAL('auth.users_id_seq', (_response->>'user_id')::INTEGER, TRUE);
+    END IF;
 
     RETURN _response;
 END;
