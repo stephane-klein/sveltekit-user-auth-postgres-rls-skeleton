@@ -210,17 +210,30 @@ DECLARE
     _response JSON;
 BEGIN
     IF (
-        (CURRENT_USER = 'webapp') AND  -- TODO webapp is a bad hack, must be refactored
+        (SESSION_USER = 'webapp') AND
+        (_spaces IS NULL)
+    ) THEN
+        SELECT json_build_object(
+            'status_code', 401,
+            'status', 'space parameter must not be empty'
+        ) INTO _response;
+
+        RETURN _response;
+    END IF;
+    IF (
+        (SESSION_USER = 'webapp') AND  -- TODO webapp is a bad hack, must be refactored
         (
-            SELECT
-                COUNT(*)
-            FROM
-                JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
-            INNER JOIN auth.spaces
-                    ON _space_records.slug = spaces.slug
-            WHERE
-                spaces.invitation_required = FALSE
-        ) = 0
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
+                INNER JOIN auth.spaces
+                        ON _space_records.slug = spaces.slug
+                WHERE
+                    spaces.invitation_required = FALSE
+            ) = 0
+        )
     ) THEN
         SELECT json_build_object(
             'status_code', 401,
@@ -267,7 +280,7 @@ BEGIN
         INNER JOIN auth.spaces
                 ON _space_records.slug = spaces.slug
         WHERE
-            (CURRENT_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
+            (SESSION_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
             (spaces.invitation_required = FALSE)
     )
     SELECT json_build_object(

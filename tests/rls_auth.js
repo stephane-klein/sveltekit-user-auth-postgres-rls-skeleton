@@ -228,11 +228,13 @@ describe("Anonymous user is connected", () => {
     afterAll(async() => {
         sql.end();
     });
+
     it("Anonymous should be able to list is_publicly_browsable spaces", async() => {
         expect(
             (await sql`SELECT COUNT(*)::INTEGER FROM auth.spaces`)[0].count
         ).toBe(3);
     });
+
     it("Anonymous should be able to create a user", async() => {
         const result = (await sql`SELECT auth.create_user(
             _id         => null,
@@ -242,8 +244,9 @@ describe("Anonymous user is connected", () => {
             _email      => 'john.doe-created@example.com',
             _password   => 'mysecret',
             _is_active  => true,
-            _spaces     => null
-        )`)[0];
-        console.log(result);
+            _spaces     => '[{"slug": "space-1", "role": "space.MEMBER"}]'
+        )`)[0].create_user;
+        expect(result.status_code).toBe(200);
+        expect(result.user_id).toBe(5);
     });
 });
