@@ -249,4 +249,34 @@ describe("Anonymous user is connected", () => {
         expect(result.status_code).toBe(200);
         expect(result.user_id).toBe(5);
     });
+
+    it("Anonymous should be able to create_user with invitation", async() => {
+        let result = (await sql`SELECT auth.create_user_from_invitation(
+            _id             => null,
+            _invitation_id  => 1,
+            _username       => 'invited_user1',
+            _first_name     => 'Alice',
+            _last_name      => 'Doe',
+            _email          => 'alice.doe@example.com',
+            _password       => 'secret',
+            _is_active      => true
+        )`)[0].create_user_from_invitation;
+        expect(result.status_code).toBe(200);
+        expect(result.user_id).toBe(6);
+
+        const invitations = await sqlFixture`SELECT * FROM auth.invitations WHERE id=1`;
+        expect(invitations[0].user_id).toBe(result.user_id);
+
+        result = (await sql`SELECT auth.create_user_from_invitation(
+            _id             => null,
+            _invitation_id  => 1,
+            _username       => 'invited_user1',
+            _first_name     => 'Alice',
+            _last_name      => 'Doe',
+            _email          => 'alice.doe@example.com',
+            _password       => 'secret',
+            _is_active      => true
+        )`)[0].create_user_from_invitation;
+        expect(result.status_code).toBe(401);
+    });
 });

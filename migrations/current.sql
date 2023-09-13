@@ -330,7 +330,7 @@ CREATE FUNCTION auth.create_user_from_invitation(
     _invitation_id   INTEGER,
     _username        VARCHAR(100),
     _first_name      VARCHAR(150),
-    _last_namea      VARCHAR(150),
+    _last_name       VARCHAR(150),
     _email           VARCHAR(360),
     _password        VARCHAR(255),
     _is_active       BOOLEAN
@@ -349,14 +349,28 @@ BEGIN
                 'status_code', 404,
                 'status', 'Invitation not found'
             ) INTO _response;
+
+        RETURN _response;
     END IF;
 
-    IF (_invitation.expires > NOW()) THEN
+    IF (_invitation.expires < NOW()) THEN
         SELECT
             JSON_BUILD_OBJECT(
                 'status_code', 401,
                 'status', 'Invitation expired'
             ) INTO _response;
+
+        RETURN _response;
+    END IF;
+
+    IF (_invitation.user_id IS NOT NULL) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 401,
+                'status', 'Invitation already used'
+            ) INTO _response;
+
+        RETURN _response;
     END IF;
 
     WITH _user AS (
@@ -371,13 +385,13 @@ BEGIN
             is_active
         )
         VALUES(
-            COALESCE(id, NEXTVAL('auth.users_id_seq')),
-            TRIM(username),
-            TRIM(first_name),
-            TRIM(last_name),
-            LOWER(TRIM(email)),
-            utils.CRYPT(TRIM(password), utils.GEN_SALT('bf', 8)),
-            is_active
+            COALESCE(_id, NEXTVAL('auth.users_id_seq')),
+            TRIM(_username),
+            TRIM(_first_name),
+            TRIM(_last_name),
+            LOWER(TRIM(_email)),
+            utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8)),
+            _is_active
         ) RETURNING id
     ),
     _space_users AS (
@@ -390,7 +404,7 @@ BEGIN
         SELECT
             (SELECT id FROM _user LIMIT 1) AS user_id,
             space_invitations.space_id     AS space_id,
-            space_invitation.role          AS role
+            space_invitations.role          AS role
         FROM
             auth.space_invitations
         WHERE
@@ -407,6 +421,10 @@ BEGIN
             'status', 'Use created',
             'user_id', (SELECT id FROM _user LIMIT 1)
         ) INTO _response;
+
+    IF ((_response->>'user_id')::INTEGER > (SELECT COALESCE(pg_sequence_last_value('auth.users_id_seq'), 0))) THEN
+        PERFORM SETVAL('auth.users_id_seq', (_response->>'user_id')::INTEGER, TRUE);
+    END IF;
 
     RETURN _response;
 END;
