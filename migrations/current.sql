@@ -751,17 +751,6 @@ CREATE POLICY space_users_read
         )
     );
 
-/*
-CREATE POLICY space_users_write
-    ON auth.space_users
-    AS PERMISSIVE
-    FOR INSERT
-    TO application_user
-    WITH CHECK (
-        space_users.space_id
-    );
-    */
-
 CREATE POLICY user_read
     ON auth.users
     AS PERMISSIVE
@@ -780,17 +769,6 @@ CREATE POLICY user_read
                 )
         )
     );
-
-    /*
-CREATE POLICY user_write
-    ON auth.users
-    AS PERMISSIVE
-    FOR INSERT
-    TO application_user
-    WITH CHECK (
-        TRUE
-    );
-    */
 
 CREATE POLICY space_invitation_read
     ON auth.space_invitations
