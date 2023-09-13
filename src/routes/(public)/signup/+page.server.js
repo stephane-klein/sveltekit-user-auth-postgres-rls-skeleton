@@ -47,6 +47,7 @@ export async function load({ locals, url }) {
 export const actions = {
     default: async({ locals, request }) => {
         const data = await request.formData();
+        console.log(data);
 
         if (
             (process.env.INVITATION_REQUIRED === "1") &&
@@ -77,6 +78,7 @@ export const actions = {
 
         const userId = (await locals.sql`
             SELECT auth.create_user(
+                id         => null,
                 username   => ${email},
                 first_name => ${data.get("first_name")},
                 last_name  => ${data.get("last_name")},

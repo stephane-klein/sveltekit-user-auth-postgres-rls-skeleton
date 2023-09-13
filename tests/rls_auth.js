@@ -230,4 +230,24 @@ describe("Anonymous user is connected", () => {
 
         sql.end();
     });
+    it("Anonymous should be able to create a user", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+
+        const userId = (await sql`SELECT auth.create_user(
+            id         => null,
+            username   => 'john-doe-created',
+            first_name => 'John',
+            last_name  => 'Doe',
+            email      => 'john.doe-created@example.com',
+            password   => 'mysecret',
+            is_active  => true,
+            spaces => null
+        )`)[0]?.create_user;
+        console.log(userId);
+
+        sql.end();
+    });
 });

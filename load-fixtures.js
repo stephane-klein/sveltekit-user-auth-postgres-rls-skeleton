@@ -49,15 +49,15 @@ async function main(sql) {
     for await (const user of data.users) {
         await sql`
             SELECT auth.create_user(
-                id         => ${user?.id || undefined},
-                username   => ${user.username},
-                first_name => ${user.first_name},
-                last_name  => ${user.last_name},
-                email      => ${user.email},
-                password   => ${user.password},
-                is_active  => TRUE,
-                spaces     => ${user.spaces}
-            ) AS user_id;
+                _id         => ${user?.id || undefined},
+                _username   => ${user.username},
+                _first_name => ${user.first_name},
+                _last_name  => ${user.last_name},
+                _email      => ${user.email},
+                _password   => ${user.password},
+                _is_active  => TRUE,
+                _spaces     => ${user.spaces}
+            )->>'user_id' AS user_id;
         `;
     }
 

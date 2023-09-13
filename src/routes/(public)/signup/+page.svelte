@@ -12,7 +12,7 @@
         {#if form?.error}<p class="error">{form.error}</p>{/if}
         <div>
             <label for="space">Space:</label>
-            <select>
+            <select id="space" name="space">
                 {#each data.spaces as space}
                     <option value={space.slug}>{space.title}</option>
                 {/each}
