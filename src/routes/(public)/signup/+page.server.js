@@ -6,7 +6,7 @@ export async function load({ locals, url }) {
     }
 
     if (url.searchParams.get("token")) {
-        const invitation = (await locals.sql`SELECT email, expires, user_id FROM auth.invitations WHERE token=${url.searchParams.get("token")}`)?.[0];
+        const invitation = (await locals.sql`SELECT * FROM auth.fetch_invitation_by_token(${url.searchParams.get("token")})`)[0];
         if (!invitation) {
             return {
                 error: "Error: invalid invitation token"
@@ -47,7 +47,6 @@ export async function load({ locals, url }) {
 export const actions = {
     default: async({ locals, request }) => {
         const data = await request.formData();
-        console.log(data);
 
         if (
             (process.env.INVITATION_REQUIRED === "1") &&
@@ -60,7 +59,7 @@ export const actions = {
 
         let result;
         if (data.get("token")) {
-            const invitation = (await locals.sql`SELECT id, email, expires, user_id FROM auth.invitations WHERE token=${data.get("token")}`)?.[0];
+            const invitation = (await locals.sql`SELECT * FROM auth.fetch_invitation_by_token(${data.get("token")})`)[0];
             if (!invitation) {
                 return {
                     error: "Error: invalid invitation token"
@@ -79,7 +78,7 @@ export const actions = {
             result = (await locals.sql`
                 SELECT auth.create_user_from_invitation(
                     _id            => null,
-                    _invitation_id => ${invitation.id}
+                    _invitation_id => ${invitation.id},
                     _username      => ${data.get("username")},
                     _first_name    => ${data.get("first_name")},
                     _last_name     => ${data.get("last_name")},
@@ -105,8 +104,11 @@ export const actions = {
                 );
             `)[0].create_user;
         }
-
-        console.log(result);
+        if (result.status_code !== 200) {
+            return {
+                error: result.status
+            };
+        }
 
         throw redirect(302, "/");
     }

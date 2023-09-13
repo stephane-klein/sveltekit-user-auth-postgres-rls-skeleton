@@ -314,6 +314,16 @@ CREATE INDEX invitations_email_index ON auth.invitations (email);
 CREATE INDEX invitations_token_index ON auth.invitations (token);
 CREATE INDEX invitations_user_id_index ON auth.invitations (user_id);
 
+DROP FUNCTION IF EXISTS auth.fetch_invitation_by_token;
+CREATE FUNCTION auth.fetch_invitation_by_token(
+    _token TEXT
+) RETURNS auth.invitations
+LANGUAGE SQL SECURITY DEFINER
+AS $$
+    SELECT * FROM auth.invitations WHERE token=_token;
+$$;
+
+
 DROP TABLE IF EXISTS auth.space_invitations CASCADE;
 CREATE TABLE auth.space_invitations (
     invitation_id  INTEGER NOT NULL REFERENCES auth.invitations(id),
@@ -699,13 +709,15 @@ GRANT ALL ON SCHEMA utils TO application_user;
 GRANT ALL ON SCHEMA auth TO application_user;
 GRANT ALL ON SCHEMA main TO application_user;
 GRANT ALL ON ALL TABLES IN SCHEMA auth TO application_user;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA auth TO application_user;
 GRANT ALL ON ALL TABLES IN SCHEMA main TO application_user;
 
-ALTER TABLE auth.users       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth.sessions    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth.invitations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth.spaces      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth.space_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.users             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.sessions          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.invitations       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.space_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.spaces            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.space_users       ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
@@ -784,12 +796,30 @@ CREATE POLICY space_invitation_read
         )
     );
 
-CREATE POLICY invisation_read
+CREATE POLICY space_invitation_write
+    ON auth.space_invitations
+    AS PERMISSIVE
+    FOR INSERT
+    TO application_user
+    WITH CHECK (
+        space_invitations.space_id=ANY(
+            SELECT
+                space_id
+            FROM
+                auth.space_users
+            WHERE
+                (user_id=NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER) AND
+                (role IN ('space.ADMIN', 'space.OWNER'))
+        )
+    );
+
+CREATE POLICY invitation_read
     ON auth.invitations
     AS PERMISSIVE
-    FOR SELECT
+    FOR ALL
     TO application_user
     USING(
+        (invitations.invited_by = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER) OR
         exists(
             SELECT *
             FROM auth.space_invitations
@@ -805,6 +835,15 @@ CREATE POLICY invisation_read
                     space_invitations.invitation_id = invitations.id
                 )
         )
+    );
+
+CREATE POLICY invitation_write
+    ON auth.invitations
+    AS PERMISSIVE
+    FOR INSERT
+    TO application_user
+    WITH CHECK (
+        invitations.invited_by=(NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
     );
 
 CREATE POLICY resource_a_read

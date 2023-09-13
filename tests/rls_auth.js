@@ -215,6 +215,109 @@ describe("When admin john-doe1 is connected", () => {
 
         sql.end();
     });
+    it("john-doe1 should be able to create an invitation for space-1", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+        const sessionId = (await sql`
+            SELECT (auth.authenticate(
+                input_username := 'john-doe1',
+                input_email := NULL,
+                input_password := 'secret1'
+            ) ->> 'session_id')::UUID AS session_id
+        `)[0].session_id;
+
+        await sql`SELECT auth.open_session(${sessionId})`;
+        const invitationId = (await sql`
+                INSERT INTO auth.invitations
+                    (
+                        id,
+                        invited_by,
+                        email,
+                        token
+                    )
+                    VALUES(
+                        1000,
+                        1,
+                        'test1@example.com',
+                        'fake token'
+                    )
+                RETURNING id
+        `)[0].id;
+        expect(invitationId).toBe(1000);
+
+        await sql`
+            INSERT INTO auth.space_invitations
+                (
+                    invitation_id,
+                    space_id,
+                    role
+                )
+                VALUES(
+                    ${invitationId},
+                    1,
+                    'space.MEMBER'
+                );
+        `;
+
+        sql.end();
+    });
+});
+
+describe("When admin john-doe2 is connected", () => {
+    it("john-doe1, a space.MEMBER can not create an invitation for space-1", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+        const sessionId = (await sql`
+            SELECT (auth.authenticate(
+                input_username := 'john-doe2',
+                input_email := NULL,
+                input_password := 'secret2'
+            ) ->> 'session_id')::UUID AS session_id
+        `)[0].session_id;
+
+        await sql`SELECT auth.open_session(${sessionId})`;
+        const invitationId = (await sql`
+                INSERT INTO auth.invitations
+                    (
+                        id,
+                        invited_by,
+                        email,
+                        token
+                    )
+                    VALUES(
+                        1000,
+                        2,
+                        'test1@example.com',
+                        'fake token'
+                    )
+                RETURNING id
+        `)[0].id;
+        expect(invitationId).toBe(1000);
+
+        expect.assertions(1);
+        try {
+            await sql`
+                INSERT INTO auth.space_invitations
+                    (
+                        invitation_id,
+                        space_id,
+                        role
+                    )
+                    VALUES(
+                        ${invitationId},
+                        1,
+                        'space.MEMBER'
+                    );
+            `;
+        } catch (e) {
+        }
+
+        sql.end();
+    });
 });
 
 describe("Anonymous user is connected", () => {
