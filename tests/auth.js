@@ -56,7 +56,7 @@ test("Create a user and login", async() => {
         )
     `)[0]?.authenticate;
 
-    expect(authenticateResult.status_code).toBe(401);
+    expect(authenticateResult.status_code).toBe(403);
 
     authenticateResult = (await sql`
         SELECT auth.authenticate(
@@ -66,5 +66,5 @@ test("Create a user and login", async() => {
         )
     `)[0]?.authenticate;
 
-    expect(authenticateResult.status_code).toBe(401);
+    expect(authenticateResult.status_code).toBe(404);
 });

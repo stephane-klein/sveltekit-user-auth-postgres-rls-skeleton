@@ -109,64 +109,119 @@ CREATE FUNCTION auth.authenticate(
 LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
 DECLARE
-    response JSON;
+    _user auth.users;
+    _response JSON;
 BEGIN
-    WITH user_authenticated AS (
-        SELECT
-            id,
-            username,
-            first_name,
-            last_name,
-            email,
-            password,
-            is_active
-        FROM
-            auth.users
-        WHERE
-            (
-                (
-                    (username = input_username) AND
-                    (password = utils.CRYPT(input_password, password))
-                ) OR
-                (
-                    (email = input_email) AND
-                    (password = utils.CRYPT(input_password, password))
-                )
-            ) AND
-            (is_active IS true)
-        LIMIT 1
-    )
-    SELECT json_build_object(
-        'status_code', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0 THEN 200 ELSE 401 END,
-        'status', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0
-            THEN 'Login successful.'
-            ELSE 'Invalid username/password combination.'
-        END,
-        'user', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0
-            THEN (
-                SELECT
-                    json_build_object(
-                        'id',         user_authenticated.id,
-                        'username',   user_authenticated.username,
-                        'first_name', user_authenticated.first_name,
-                        'last_name',  user_authenticated.last_name,
-                        'email',      user_authenticated.email,
-                        'password',   user_authenticated.password
-                    )
-                FROM
-                    user_authenticated
-            )
-            ELSE NULL
-	    END,
-	    'session_id', (SELECT auth.create_session(user_authenticated.id) FROM user_authenticated)
-    ) INTO response;
+    SELECT
+        * INTO _user
+    FROM
+        auth.users
+    WHERE
+        (username = input_username) OR
+        (email = input_email);
 
-    IF ((response->>'status_code')::INTEGER = 200) THEN
+    IF (_user IS NULL) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 404,
+                'status', 'Login failed user not found'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                details
+            )
+            VALUES(
+                'auth.users',
+                NULL,
+                'user.LOGIN_FAILED_USER_NOT_FOUND',
+                JSONB_BUILD_OBJECT(
+                    'username', input_username,
+                    'email', input_email
+                )
+            );
+
+        RETURN _response;
+    END IF;
+
+    IF (_user.is_active IS FALSE) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 403,
+                'status', 'Login failed, user ' || _user.username || 'deactivate'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type
+            )
+            VALUES(
+                'auth.users',
+                _user.id,
+                'user.LOGIN_FAILED_USER_DEACTIVATE'
+            );
+
+        RETURN _response;
+    END IF;
+
+    IF (_user.password != utils.CRYPT(input_password, _user.password)) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 403,
+                'status', 'Login failed, bad password'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type
+            )
+            VALUES(
+                'auth.users',
+                _user.id,
+                'user.LOGIN_FAILED_BAD_PASSWORD'
+            );
+
+        RETURN _response;
+    END IF;
+
+    WITH _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type
+        )
+        VALUES(
+            'auth.users',
+            _user.id,
+            'user.LOGIN_SUCCESS'
+        )
+    ),
+    _update AS (
         UPDATE auth.users
            SET last_login = NOW()
-         WHERE id=(response->'user'->>'id')::INTEGER;
-    END IF;
-    RETURN response;
+         WHERE id=_user.id
+    )
+    SELECT json_build_object(
+        'status_code', 200,
+        'status', 'Login successful',
+        'user', json_build_object(
+            'id',         _user.id,
+            'username',   _user.username,
+            'first_name', _user.first_name,
+            'last_name',  _user.last_name,
+            'email',      _user.email
+        ),
+	    'session_id', (SELECT auth.create_session(_user.id))
+    ) INTO _response;
+
+    RETURN _response;
 END;
 $$;
 
@@ -691,7 +746,10 @@ CREATE TYPE auth.entity_types AS ENUM (
 
 DROP TYPE IF EXISTS auth.audit_event_types;
 CREATE TYPE auth.audit_event_types AS ENUM (
-    'user.LOGIN',
+    'user.LOGIN_SUCCESS',
+    'user.LOGIN_FAILED_USER_DEACTIVATE',
+    'user.LOGIN_FAILED_USER_NOT_FOUND',
+    'user.LOGIN_FAILED_BAD_PASSWORD',
     'user.SIGNUP',
     'user.LOGOUT',
     'CREATED',
@@ -718,7 +776,7 @@ CREATE TABLE auth.audit_events (
         DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv6_address', TRUE), '')),
 
     event_type             auth.audit_event_types,
-    event_message          VARCHAR(255) DEFAULT NULL
+    details                JSONB DEFAULT NULL
 );
 CREATE INDEX audit_events_author_id_index    ON auth.audit_events (author_id);
 CREATE INDEX audit_events_created_at_index   ON auth.audit_events (created_at);
