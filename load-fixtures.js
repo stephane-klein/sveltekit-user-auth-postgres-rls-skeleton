@@ -21,6 +21,38 @@ async function main(sql) {
         ALTER SEQUENCE main.resource_b_id_seq RESTART WITH 1;
     `.simple();
 
+    // Fixture execute all actions logged in as root user
+    await sql`
+        SELECT SET_CONFIG(
+            'auth.user_id',
+            '0',
+            FALSE
+        );
+    `;
+
+    await sql`
+        INSERT INTO auth.users (
+            id,
+            username,
+            email,
+            password,
+            is_active,
+            is_superuser,
+            is_serviceuser,
+            date_joined
+        )
+        VALUES (
+            0,                   -- id,
+            'root',              -- username,
+            'noreply@localhost', -- email,
+            '',                  -- password,
+            TRUE,                -- is_active,
+            TRUE,                -- is_superuser,
+            TRUE,                -- is_serviceuser,
+            NOW()                -- date_joined
+        )
+    `;
+
     async function import_spaces(spaces, parent_space_id) {
         for await (const space of spaces) {
             const space_id = (await sql`

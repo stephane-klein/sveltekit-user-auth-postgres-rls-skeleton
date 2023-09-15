@@ -35,12 +35,19 @@ CREATE TABLE auth.users (
     last_name              VARCHAR(150) DEFAULT NULL,
     email                  VARCHAR(360) NOT NULL UNIQUE,
     password               VARCHAR(255) NOT NULL,
-    is_active              BOOLEAN DEFAULT false,
+    is_active              BOOLEAN DEFAULT FALSE,
+    is_superuser           BOOLEAN DEFAULT FALSE,
+    is_serviceuser         BOOLEAN DEFAULT FALSE,
     last_login             TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     date_joined            TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    created_by INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
+
     updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE auth.users ADD CONSTRAINT users_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users (id) ON DELETE SET NULL;
 CREATE INDEX users_username_index    ON auth.users (username);
 CREATE INDEX users_first_name_index  ON auth.users (first_name);
 CREATE INDEX users_last_name_index   ON auth.users (last_name);
@@ -50,6 +57,27 @@ CREATE INDEX users_last_login_index  ON auth.users (last_login);
 CREATE INDEX users_date_joined_index ON auth.users (date_joined);
 CREATE INDEX users_created_at_index  ON auth.users (created_at);
 CREATE INDEX users_updated_at_index  ON auth.users (updated_at);
+
+INSERT INTO auth.users (
+    id,
+    username,
+    email,
+    password,
+    is_active,
+    is_superuser,
+    is_serviceuser,
+    date_joined
+)
+VALUES (
+    0,                   -- id,
+    'root',              -- username,
+    'noreply@localhost', -- email,
+    '',                  -- password,
+    TRUE,                -- is_active,
+    TRUE,                -- is_superuser,
+    TRUE,                -- is_serviceuser,
+    NOW()                -- date_joined
+);
 
 DROP TABLE IF EXISTS auth.sessions CASCADE;
 CREATE TABLE auth.sessions(
@@ -151,7 +179,11 @@ CREATE TABLE auth.spaces (
     is_publicly_browsable  BOOLEAN DEFAULT FALSE,
     invitation_required    BOOLEAN DEFAULT TRUE,
 
-    created_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_by
+        INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
+
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     updated_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -184,7 +216,11 @@ CREATE TABLE auth.space_users (
     user_id     INTEGER NOT NULL REFERENCES auth.users(id),
     space_id    INTEGER NOT NULL REFERENCES auth.spaces(id),
     role        auth.roles NOT NULL,
-    created_by  INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    created_by INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
+
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE INDEX space_users_user_id_index ON auth.space_users (user_id);
@@ -643,7 +679,10 @@ CREATE TABLE main.resource_a (
     content                TEXT NOT NULL,
 
     created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    created_by INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
 
     updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -671,7 +710,10 @@ CREATE TABLE main.resource_b (
     content                TEXT NOT NULL,
 
     created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    created_by INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
 
     updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_by             INTEGER DEFAULT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
