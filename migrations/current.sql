@@ -666,6 +666,48 @@ AS $$
      WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
 $$;
 
+DROP TYPE IF EXISTS auth.entity_types;
+CREATE TYPE auth.entity_types AS ENUM (
+    'auth.users',
+    'auth.spaces',
+    'auth.space_users',
+    'auth.invitations',
+    'auth.space_invitations',
+    'main.resource_a',
+    'main.resource_b'
+);
+
+DROP TYPE IF EXISTS auth.audit_event_types;
+CREATE TYPE auth.audit_event_types AS ENUM (
+    'user.LOGIN',
+    'user.SIGNUP',
+    'user.LOGOUT',
+    'CREATED',
+    'DESTROYED',
+    'UPDATED',
+    'CLOSED'
+);
+
+DROP TABLE IF EXISTS auth.audit_events CASCADE;
+CREATE TABLE auth.audit_events (
+    id                     SERIAL PRIMARY KEY,
+    author_id              INTEGER NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    entity_type            auth.entity_types DEFAULT NULL,
+    entity_id              INTEGER DEFAULT NULL,
+    ipv4_address           VARCHAR,
+    ipv6_address           VARCHAR,
+    event_type             auth.audit_event_types,
+    event_message          VARCHAR(255)
+);
+CREATE INDEX audit_events_author_id_index    ON auth.audit_events (author_id);
+CREATE INDEX audit_events_created_at_index   ON auth.audit_events (created_at);
+CREATE INDEX audit_events_entity_type_index  ON auth.audit_events (entity_type);
+CREATE INDEX audit_events_entity_id_index    ON auth.audit_events (entity_id);
+CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
+CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
+CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
+
 -- Main section
 
 CREATE SCHEMA IF NOT EXISTS main;
@@ -692,7 +734,7 @@ CREATE TABLE main.resource_a (
 
     CONSTRAINT fk_space_id FOREIGN KEY (space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE
 );
-CREATE INDEX resource_a_space_id_index  ON main.resource_a (space_id);
+CREATE INDEX resource_a_space_id_index   ON main.resource_a (space_id);
 CREATE INDEX resource_a_slug_index       ON main.resource_a (slug);
 CREATE INDEX resource_a_created_at_index ON main.resource_a (created_at);
 CREATE INDEX resource_a_created_by_index ON main.resource_a (created_by);
