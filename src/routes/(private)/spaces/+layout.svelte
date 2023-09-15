@@ -20,6 +20,8 @@
         {/if}
     {/if}
     |
+    <a data-sveltekit-reload href="/audit-events/">Audit events</a>
+    |
     <a data-sveltekit-reload href="/logout/">Logout</a>
 </p>
 
