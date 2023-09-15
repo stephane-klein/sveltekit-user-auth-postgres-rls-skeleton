@@ -318,6 +318,18 @@ BEGIN
         WHERE
             (SESSION_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
             (spaces.invitation_required = FALSE)
+    ),
+    _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type
+        )
+        VALUES(
+            'auth.users',                   -- entity_type
+            (SELECT id FROM _user LIMIT 1), -- entity_id
+            'CREATED'                       -- event_type
+        )
     )
     SELECT json_build_object(
         'status_code', 200,
@@ -691,21 +703,29 @@ CREATE TYPE auth.audit_event_types AS ENUM (
 DROP TABLE IF EXISTS auth.audit_events CASCADE;
 CREATE TABLE auth.audit_events (
     id                     SERIAL PRIMARY KEY,
-    author_id              INTEGER NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
-    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+    author_id INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     entity_type            auth.entity_types DEFAULT NULL,
     entity_id              INTEGER DEFAULT NULL,
-    ipv4_address           VARCHAR,
-    ipv6_address           VARCHAR,
+    ipv4_address VARCHAR
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv4_address', TRUE), '')),
+
+    ipv6_address VARCHAR
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv6_address', TRUE), '')),
+
     event_type             auth.audit_event_types,
-    event_message          VARCHAR(255)
+    event_message          VARCHAR(255) DEFAULT NULL
 );
 CREATE INDEX audit_events_author_id_index    ON auth.audit_events (author_id);
 CREATE INDEX audit_events_created_at_index   ON auth.audit_events (created_at);
 CREATE INDEX audit_events_entity_type_index  ON auth.audit_events (entity_type);
 CREATE INDEX audit_events_entity_id_index    ON auth.audit_events (entity_id);
 CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
-CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
+CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
 CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
 
 -- Main section
