@@ -728,6 +728,29 @@ CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address)
 CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
 CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
 
+DROP PROCEDURE IF EXISTS auth.space_after_insert_row;
+CREATE FUNCTION auth.space_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type
+    )
+    VALUES (
+        'auth.spaces',
+        NEW.id,
+        'CREATED'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER space_after_insert
+    AFTER INSERT ON auth.spaces
+    FOR EACH ROW
+    EXECUTE FUNCTION auth.space_after_insert_row();
+
 -- Main section
 
 CREATE SCHEMA IF NOT EXISTS main;
@@ -763,6 +786,29 @@ CREATE INDEX resource_a_updated_by_index ON main.resource_a (updated_by);
 CREATE INDEX resource_a_deleted_at_index ON main.resource_a (deleted_at);
 CREATE INDEX resource_a_deleted_by_index ON main.resource_a (deleted_by);
 
+DROP PROCEDURE IF EXISTS main.resource_a_after_insert_row;
+CREATE FUNCTION main.resource_a_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type
+    )
+    VALUES (
+        'main.resource_a',
+        NEW.id,
+        'CREATED'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER resource_a_after_insert
+    AFTER INSERT ON main.resource_a
+    FOR EACH ROW
+    EXECUTE FUNCTION main.resource_a_after_insert_row();
+
 DROP TABLE IF EXISTS main.resource_b CASCADE;
 CREATE TABLE main.resource_b (
     id                     SERIAL PRIMARY KEY,
@@ -793,6 +839,30 @@ CREATE INDEX resource_b_updated_at_index ON main.resource_b (updated_at);
 CREATE INDEX resource_b_updated_by_index ON main.resource_b (updated_by);
 CREATE INDEX resource_b_deleted_at_index ON main.resource_b (deleted_at);
 CREATE INDEX resource_b_deleted_by_index ON main.resource_b (deleted_by);
+
+DROP PROCEDURE IF EXISTS main.resource_b_after_insert_row;
+CREATE FUNCTION main.resource_b_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type
+    )
+    VALUES (
+        'main.resource_b',
+        NEW.id,
+        'CREATED'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER resource_b_after_insert
+    AFTER INSERT ON main.resource_b
+    FOR EACH ROW
+    EXECUTE FUNCTION main.resource_b_after_insert_row();
+
 
 -- Setup Row-Level Security (https://www.postgresql.org/docs/15/ddl-rowsecurity.html)
 
