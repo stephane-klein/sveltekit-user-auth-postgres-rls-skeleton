@@ -340,14 +340,15 @@ describe("Anonymous user is connected", () => {
 
     it("Anonymous should be able to create a user", async() => {
         const result = (await sql`SELECT auth.create_user(
-            _id         => null,
-            _username   => 'john-doe-created',
-            _first_name => 'John',
-            _last_name  => 'Doe',
-            _email      => 'john.doe-created@example.com',
-            _password   => 'mysecret',
-            _is_active  => true,
-            _spaces     => '[{"slug": "space-1", "role": "space.MEMBER"}]'
+            _id           => null,
+            _username     => 'john-doe-created',
+            _first_name   => 'John',
+            _last_name    => 'Doe',
+            _email        => 'john.doe-created@example.com',
+            _password     => 'mysecret',
+            _is_active    => true,
+            _is_superuser => false,
+            _spaces       => '[{"slug": "space-1", "role": "space.MEMBER"}]'
         )`)[0].create_user;
         expect(result.status_code).toBe(200);
         expect(result.user_id).toBe(5);

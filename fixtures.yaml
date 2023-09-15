@@ -22,6 +22,7 @@ users:
     first_name: John
     last_name: Doe1
     email: john.doe1@example.com
+    is_superuser: true
     password: secret1
     spaces:
       - slug: space-1

@@ -20,14 +20,15 @@ test("Create a user and login", async() => {
     await sql`DELETE FROM auth.sessions CASCADE`;
 
     const userId = (await sql`SELECT auth.create_user(
-        _id         => null,
-        _username   => 'john-doe',
-        _first_name => 'John',
-        _last_name  => 'Doe',
-        _email      => 'john.doe@example.com',
-        _password   => 'secret',
-        _is_active  => true,
-        _spaces     => null
+        _id           => null,
+        _username     => 'john-doe',
+        _first_name   => 'John',
+        _last_name    => 'Doe',
+        _email        => 'john.doe@example.com',
+        _password     => 'secret',
+        _is_active    => true,
+        _is_superuser => false,
+        _spaces       => null
     )`)[0]?.create_user.user_id;
 
     expect(

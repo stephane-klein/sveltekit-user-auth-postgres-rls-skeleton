@@ -293,6 +293,7 @@ CREATE FUNCTION auth.create_user(
     _email                 VARCHAR(360),
     _password              VARCHAR(255),
     _is_active             BOOLEAN,
+    _is_superuser          BOOLEAN,
     _spaces                JSONB
 ) RETURNS JSON
 LANGUAGE 'plpgsql' SECURITY DEFINER
@@ -343,7 +344,8 @@ BEGIN
             last_name,
             email,
             password,
-            is_active
+            is_active,
+            is_superuser
         )
         VALUES(
             COALESCE(_id, NEXTVAL('auth.users_id_seq')),
@@ -352,7 +354,8 @@ BEGIN
             TRIM(_last_name),
             LOWER(TRIM(_email)),
             utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8)),
-            _is_active
+            _is_active,
+            FALSE
         ) RETURNING id
     ),
     _space_users AS (
