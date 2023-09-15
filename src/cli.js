@@ -35,13 +35,14 @@ yargs(hideBin(process.argv))
                 try {
                     await sql`
                         SELECT auth.create_user(
-                            username   => ${argv.username},
-                            first_name => ${argv?.firstname || ""},
-                            last_name  => ${argv?.lastname || ""},
-                            email      => ${argv.email},
-                            password   => ${argv.password},
-                            is_active  => TRUE,
-                            spaces     => NULL
+                            username     => ${argv.username},
+                            first_name   => ${argv?.firstname || ""},
+                            last_name    => ${argv?.lastname || ""},
+                            email        => ${argv.email},
+                            password     => ${argv.password},
+                            is_active    => TRUE,
+                            is_superuser => FALSE,
+                            spaces       => NULL
                         );
                     `;
                 } catch (err) {

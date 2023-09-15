@@ -1,5 +1,10 @@
 <script>
     export let data;
+    if (data.status_code == 200) {
+        window.location = data.redirect;
+    }
 </script>
 
-<p>Error: {data.status}</p>
+{#if data.status_code != 200}
+    <p>Error: {data.status}</p>
+{/if}

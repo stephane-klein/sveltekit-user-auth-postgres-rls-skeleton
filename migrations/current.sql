@@ -7,6 +7,7 @@ CREATE SCHEMA IF NOT EXISTS utils;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA utils;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA utils;
+CREATE EXTENSION IF NOT EXISTS "intarray" WITH SCHEMA utils;
 
 -- Helper section
 
@@ -91,6 +92,7 @@ CREATE TABLE auth.sessions(
 CREATE INDEX sessions_user_id_index ON auth.sessions (user_id);
 CREATE INDEX sessions_impersonate_user_id_index ON auth.sessions (impersonate_user_id);
 
+DROP FUNCTION IF EXISTS auth.create_session;
 CREATE OR REPLACE FUNCTION auth.create_session(
     input_user_id INTEGER
 ) RETURNS UUID
@@ -98,7 +100,7 @@ LANGUAGE SQL
 AS $$
     DELETE FROM auth.sessions WHERE user_id = input_user_id;
     INSERT INTO auth.sessions (user_id) VALUES (input_user_id) RETURNING sessions.id;
-$$;;
+$$;
 
 DROP FUNCTION IF EXISTS auth.authenticate;
 CREATE FUNCTION auth.authenticate(
@@ -109,64 +111,127 @@ CREATE FUNCTION auth.authenticate(
 LANGUAGE 'plpgsql' SECURITY DEFINER
 AS $$
 DECLARE
-    response JSON;
+    _user auth.users;
+    _response JSON;
 BEGIN
-    WITH user_authenticated AS (
-        SELECT
-            id,
-            username,
-            first_name,
-            last_name,
-            email,
-            password,
-            is_active
-        FROM
-            auth.users
-        WHERE
-            (
-                (
-                    (username = input_username) AND
-                    (password = utils.CRYPT(input_password, password))
-                ) OR
-                (
-                    (email = input_email) AND
-                    (password = utils.CRYPT(input_password, password))
-                )
-            ) AND
-            (is_active IS true)
-        LIMIT 1
-    )
-    SELECT json_build_object(
-        'status_code', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0 THEN 200 ELSE 401 END,
-        'status', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0
-            THEN 'Login successful.'
-            ELSE 'Invalid username/password combination.'
-        END,
-        'user', CASE WHEN (SELECT COUNT(*) FROM user_authenticated) > 0
-            THEN (
-                SELECT
-                    json_build_object(
-                        'id',         user_authenticated.id,
-                        'username',   user_authenticated.username,
-                        'first_name', user_authenticated.first_name,
-                        'last_name',  user_authenticated.last_name,
-                        'email',      user_authenticated.email,
-                        'password',   user_authenticated.password
-                    )
-                FROM
-                    user_authenticated
-            )
-            ELSE NULL
-	    END,
-	    'session_id', (SELECT auth.create_session(user_authenticated.id) FROM user_authenticated)
-    ) INTO response;
+    SELECT
+        * INTO _user
+    FROM
+        auth.users
+    WHERE
+        (username = input_username) OR
+        (email = input_email);
 
-    IF ((response->>'status_code')::INTEGER = 200) THEN
+    IF (_user IS NULL) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 404,
+                'status', 'Login failed user not found'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                space_ids,
+                event_type,
+                details
+            )
+            VALUES(
+                'auth.users',
+                NULL,
+                NULL,
+                'user.LOGIN_FAILED_USER_NOT_FOUND',
+                JSONB_BUILD_OBJECT(
+                    'username', input_username,
+                    'email', input_email
+                )
+            );
+
+        RETURN _response;
+    END IF;
+
+    IF (_user.is_active IS FALSE) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 403,
+                'status', 'Login failed, user ' || _user.username || 'deactivate'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type
+            )
+            VALUES(
+                'auth.users',
+                _user.id,
+                'user.LOGIN_FAILED_USER_DEACTIVATE'
+            );
+
+        RETURN _response;
+    END IF;
+
+    IF (_user.password != utils.CRYPT(input_password, _user.password)) THEN
+        SELECT
+            JSON_BUILD_OBJECT(
+                'status_code', 403,
+                'status', 'Login failed, bad password'
+            ) INTO _response;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type
+            )
+            VALUES(
+                'auth.users',
+                _user.id,
+                'user.LOGIN_FAILED_BAD_PASSWORD'
+            );
+
+        RETURN _response;
+    END IF;
+
+    WITH _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',
+            _user.id,
+            'user.LOGIN_SUCCESS',
+            (
+                SELECT ARRAY_AGG(space_id)
+                FROM auth.space_users
+                WHERE user_id = _user.id
+            )
+        )
+    ),
+    _update AS (
         UPDATE auth.users
            SET last_login = NOW()
-         WHERE id=(response->'user'->>'id')::INTEGER;
-    END IF;
-    RETURN response;
+         WHERE id=_user.id
+    )
+    SELECT json_build_object(
+        'status_code', 200,
+        'status', 'Login successful',
+        'user', json_build_object(
+            'id',         _user.id,
+            'username',   _user.username,
+            'first_name', _user.first_name,
+            'last_name',  _user.last_name,
+            'email',      _user.email
+        ),
+	    'session_id', (SELECT auth.create_session(_user.id))
+    ) INTO _response;
+
+    RETURN _response;
 END;
 $$;
 
@@ -238,6 +303,7 @@ CREATE FUNCTION auth.create_user(
     _email                 VARCHAR(360),
     _password              VARCHAR(255),
     _is_active             BOOLEAN,
+    _is_superuser          BOOLEAN,
     _spaces                JSONB
 ) RETURNS JSON
 LANGUAGE 'plpgsql' SECURITY DEFINER
@@ -288,7 +354,8 @@ BEGIN
             last_name,
             email,
             password,
-            is_active
+            is_active,
+            is_superuser
         )
         VALUES(
             COALESCE(_id, NEXTVAL('auth.users_id_seq')),
@@ -297,7 +364,8 @@ BEGIN
             TRIM(_last_name),
             LOWER(TRIM(_email)),
             utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8)),
-            _is_active
+            _is_active,
+            FALSE
         ) RETURNING id
     ),
     _space_users AS (
@@ -318,6 +386,27 @@ BEGIN
         WHERE
             (SESSION_USER != 'webapp') OR -- TODO webapp is a bad hack, must be refactored
             (spaces.invitation_required = FALSE)
+    ),
+    _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',                   -- entity_type
+            (SELECT id FROM _user LIMIT 1), -- entity_id
+            'user.SIGNUP',                  -- event_type
+            (
+                SELECT
+                    ARRAY_AGG(spaces.id)
+                FROM
+                    JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
+                INNER JOIN auth.spaces
+                        ON _space_records.slug = spaces.slug
+            )
+        )
     )
     SELECT json_build_object(
         'status_code', 200,
@@ -460,6 +549,27 @@ BEGIN
         UPDATE auth.invitations
            SET user_id=(SELECT id FROM _user LIMIT 1)
          WHERE id=_invitation_id
+    ),
+    _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',                   -- entity_type
+            (SELECT id FROM _user LIMIT 1), -- entity_id
+            'user.INVITATION_SIGNUP',       -- event_type
+            (
+                SELECT
+                    ARRAY_AGG(space_invitations.space_id)
+                FROM
+                    auth.space_invitations
+                WHERE
+                    space_invitations.invitation_id=_invitation_id
+            )
+        )
     )
     SELECT
         JSON_BUILD_OBJECT(
@@ -612,6 +722,89 @@ AS $$
         );
 $$;
 
+DROP TYPE IF EXISTS auth.entity_types;
+CREATE TYPE auth.entity_types AS ENUM (
+    'auth.users',
+    'auth.spaces',
+    'auth.space_users',
+    'auth.invitations',
+    'auth.space_invitations',
+    'main.resource_a',
+    'main.resource_b'
+);
+
+DROP TYPE IF EXISTS auth.audit_event_types;
+CREATE TYPE auth.audit_event_types AS ENUM (
+    'user.LOGIN_SUCCESS',
+    'user.LOGIN_FAILED_USER_DEACTIVATE',
+    'user.LOGIN_FAILED_USER_NOT_FOUND',
+    'user.LOGIN_FAILED_BAD_PASSWORD',
+    'user.SIGNUP',
+    'user.INVITATION_SIGNUP',
+    'user.LOGOUT',
+    'user.ENTER_IMPERSONATE',
+    'user.EXIT_IMPERSONATE',
+    'user.RESET_PASSWORD_ASKED',
+    'user.PASSWORD_CHANGED',
+    'CREATED',
+    'DESTROYED',
+    'UPDATED',
+    'CLOSED'
+);
+
+
+DROP TABLE IF EXISTS auth.audit_events CASCADE;
+CREATE TABLE auth.audit_events (
+    id                     SERIAL PRIMARY KEY,
+
+    author_id INTEGER
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        REFERENCES auth.users(id) ON DELETE SET NULL,
+
+    created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    entity_type            auth.entity_types DEFAULT NULL,
+    entity_id              INTEGER DEFAULT NULL,
+    space_ids              INTEGER[] DEFAULT NULL,
+
+    ipv4_address VARCHAR
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv4_address', TRUE), '')),
+
+    ipv6_address VARCHAR
+        DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv6_address', TRUE), '')),
+
+    event_type             auth.audit_event_types,
+    details                JSONB DEFAULT NULL
+);
+CREATE INDEX audit_events_author_id_index    ON auth.audit_events (author_id);
+CREATE INDEX audit_events_created_at_index   ON auth.audit_events (created_at);
+CREATE INDEX audit_events_entity_type_index  ON auth.audit_events (entity_type);
+CREATE INDEX audit_events_entity_id_index    ON auth.audit_events (entity_id);
+CREATE INDEX audit_events_space_ids_index    ON auth.audit_events USING GIST (space_ids utils.gist__int_ops);
+CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
+CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
+CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
+
+DROP FUNCTION IF EXISTS auth.space_after_insert_row;
+CREATE FUNCTION auth.space_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type,
+        space_ids
+    )
+    VALUES (
+        'auth.spaces',
+        NEW.id,
+        'CREATED',
+        ARRAY[NEW.id]
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 DROP FUNCTION IF EXISTS auth.impersonate;
 CREATE FUNCTION auth.impersonate(_username VARCHAR) RETURNS JSON
 LANGUAGE 'plpgsql' SECURITY DEFINER
@@ -640,13 +833,32 @@ BEGIN
         RETURN (
             SELECT json_build_object(
                 'status_code', 401,
-                'status', 'Either the user ' || _username || 'does not exist, or you are not authorized to play him.'
+                'status', 'Either the user ' || _username || 'does not exist, or you are not authorized to impersonate him.'
             )
         );
     ELSE
         UPDATE auth.sessions
         SET impersonate_user_id=_user_id
         WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                _user_id,
+                'user.ENTER_IMPERSONATE',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+                )
+            );
+
         RETURN (
             SELECT json_build_object(
                 'status_code', 200,
@@ -664,7 +876,141 @@ AS $$
     UPDATE auth.sessions
        SET impersonate_user_id=NULL
      WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
+
+    INSERT INTO auth.audit_events
+        (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',
+            (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
+            'user.EXIT_IMPERSONATE',
+            (
+                SELECT ARRAY_AGG(space_id)
+                FROM auth.space_users
+                WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+            )
+        );
 $$;
+
+DROP FUNCTION IF EXISTS auth.logout;
+CREATE FUNCTION auth.logout() RETURNS VOID
+LANGUAGE SQL
+AS $$
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type,
+        space_ids
+    )
+    VALUES(
+        'auth.users',
+        (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
+        'user.LOGOUT',
+        (
+            SELECT ARRAY_AGG(space_id)
+            FROM auth.space_users
+            WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        )
+    );
+$$;
+
+DROP FUNCTION IF EXISTS auth.anonymous_user_ask_reset_password;
+CREATE FUNCTION auth.anonymous_user_ask_reset_password(_email VARCHAR) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _result JSON;
+BEGIN
+    SELECT
+        JSONB_BUILD_OBJECT(
+            'id', users.id,
+            'email', users.email
+        ) INTO _result
+    FROM auth.users
+    WHERE email=_email;
+
+    IF (_result->'id' IS NOT NULL) THEN
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                (_result->>'id')::INTEGER,
+                'user.RESET_PASSWORD_ASKED',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (_result->>'id')::INTEGER
+                )
+            );
+    END IF;
+
+    RETURN _result;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS auth.anonymous_user_change_password;
+CREATE FUNCTION auth.anonymous_user_change_password(_email VARCHAR, _password VARCHAR) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _user_id INTEGER;
+BEGIN
+    UPDATE auth.users
+        SET password=utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8))
+        WHERE email=_email
+        RETURNING id INTO _user_id;
+
+    IF (_user_id IS NOT NULL) THEN
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                _user_id,
+                'user.PASSWORD_CHANGED',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = _user_id
+                )
+            );
+
+            RETURN (
+                SELECT json_build_object(
+                    'status_code', 200,
+                    'status', 'Password changed'
+                )
+            );
+    END IF;
+
+    RETURN (
+        SELECT json_build_object(
+            'status_code', 404,
+            'status', 'User not found'
+        )
+    );
+END;
+$$;
+
+
+CREATE TRIGGER space_after_insert
+    AFTER INSERT ON auth.spaces
+    FOR EACH ROW
+    EXECUTE FUNCTION auth.space_after_insert_row();
 
 -- Main section
 
@@ -692,7 +1038,7 @@ CREATE TABLE main.resource_a (
 
     CONSTRAINT fk_space_id FOREIGN KEY (space_id) REFERENCES auth.spaces (id) ON DELETE CASCADE
 );
-CREATE INDEX resource_a_space_id_index  ON main.resource_a (space_id);
+CREATE INDEX resource_a_space_id_index   ON main.resource_a (space_id);
 CREATE INDEX resource_a_slug_index       ON main.resource_a (slug);
 CREATE INDEX resource_a_created_at_index ON main.resource_a (created_at);
 CREATE INDEX resource_a_created_by_index ON main.resource_a (created_by);
@@ -700,6 +1046,31 @@ CREATE INDEX resource_a_updated_at_index ON main.resource_a (updated_at);
 CREATE INDEX resource_a_updated_by_index ON main.resource_a (updated_by);
 CREATE INDEX resource_a_deleted_at_index ON main.resource_a (deleted_at);
 CREATE INDEX resource_a_deleted_by_index ON main.resource_a (deleted_by);
+
+DROP FUNCTION IF EXISTS main.resource_a_after_insert_row;
+CREATE FUNCTION main.resource_a_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type,
+        space_ids
+    )
+    VALUES (
+        'main.resource_a',
+        NEW.id,
+        'CREATED',
+        ARRAY[NEW.space_id]
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER resource_a_after_insert
+    AFTER INSERT ON main.resource_a
+    FOR EACH ROW
+    EXECUTE FUNCTION main.resource_a_after_insert_row();
 
 DROP TABLE IF EXISTS main.resource_b CASCADE;
 CREATE TABLE main.resource_b (
@@ -732,6 +1103,32 @@ CREATE INDEX resource_b_updated_by_index ON main.resource_b (updated_by);
 CREATE INDEX resource_b_deleted_at_index ON main.resource_b (deleted_at);
 CREATE INDEX resource_b_deleted_by_index ON main.resource_b (deleted_by);
 
+DROP FUNCTION IF EXISTS main.resource_b_after_insert_row;
+CREATE FUNCTION main.resource_b_after_insert_row() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type,
+        space_ids
+    )
+    VALUES (
+        'main.resource_b',
+        NEW.id,
+        'CREATED',
+        ARRAY[NEW.space_id]
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER resource_b_after_insert
+    AFTER INSERT ON main.resource_b
+    FOR EACH ROW
+    EXECUTE FUNCTION main.resource_b_after_insert_row();
+
+
 -- Setup Row-Level Security (https://www.postgresql.org/docs/15/ddl-rowsecurity.html)
 
 SELECT utils.create_role_if_not_exists('application_user');
@@ -747,6 +1144,109 @@ DO $$ BEGIN
     END IF;
 END $$;
 
+DROP FUNCTION IF EXISTS auth.get_entity_details;
+CREATE OR REPLACE FUNCTION auth.get_entity_details(
+    entity_type auth.entity_types,
+    entity_id INTEGER
+) RETURNS JSONB
+LANGUAGE SQL
+AS $$
+    SELECT
+        CASE
+            WHEN entity_type = 'auth.users' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', username,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM auth.users
+                    LEFT JOIN auth.space_users
+                           ON users.id = space_users.user_id
+                    LEFT JOIN auth.spaces
+                           ON space_users.space_id = spaces.id
+                    WHERE users.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'auth.invitations' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', invitations.email,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM auth.invitations
+                    LEFT JOIN auth.space_invitations
+                           ON invitations.id = space_invitations.invitation_id
+                    LEFT JOIN auth.spaces
+                           ON space_invitations.space_id = spaces.id
+                    WHERE invitations.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'main.resource_a' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', resource_a.title,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM main.resource_a
+                    LEFT JOIN auth.spaces
+                           ON resource_a.space_id = spaces.id
+                    WHERE resource_a.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'main.resource_b' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', resource_b.title,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM main.resource_b
+                    LEFT JOIN auth.spaces
+                           ON resource_b.space_id = spaces.id
+                    WHERE resource_b.id=entity_id
+                    LIMIT 1
+                )
+        END
+    ;
+$$;
+
+CREATE VIEW auth.view_audit_events AS
+    SELECT
+        TO_CHAR(audit_events.created_at, 'YYYY-MM-dd HH24:MI:SS') AS created_at,
+        (
+            CASE
+                WHEN users.username IS NULL THEN
+                    'Anonymous'
+                ELSE
+                    users.username
+            END
+        ) AS author_username,
+        audit_events.author_id AS author_id,
+        audit_events.event_type,
+        audit_events.entity_type,
+        audit_events.entity_id,
+        (
+            auth.get_entity_details(
+                audit_events.entity_type,
+                audit_events.entity_id
+            )
+        ) AS entity_details,
+
+        audit_events.ipv4_address,
+        audit_events.ipv6_address
+    FROM
+        auth.audit_events
+    LEFT JOIN auth.users
+           ON audit_events.author_id=users.id
+    ORDER BY created_at DESC;
+
 GRANT ALL ON SCHEMA utils TO application_user;
 GRANT ALL ON SCHEMA auth TO application_user;
 GRANT ALL ON SCHEMA main TO application_user;
@@ -760,6 +1260,7 @@ ALTER TABLE auth.invitations       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.space_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.spaces            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.space_users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.audit_events      ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
@@ -886,6 +1387,30 @@ CREATE POLICY invitation_write
     TO application_user
     WITH CHECK (
         invitations.invited_by=(NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+    );
+
+CREATE POLICY audit_events_read
+    ON auth.audit_events
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        (
+            REGEXP_SPLIT_TO_ARRAY(
+                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
+                ','
+            )::INTEGER[]
+        ) && space_ids
+    );
+
+CREATE POLICY audit_events_write
+    ON auth.audit_events
+    AS PERMISSIVE
+    FOR INSERT
+    TO application_user
+    WITH CHECK (
+        (audit_events.author_id IS NULL) OR
+        (audit_events.author_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER)
     );
 
 CREATE POLICY resource_a_read

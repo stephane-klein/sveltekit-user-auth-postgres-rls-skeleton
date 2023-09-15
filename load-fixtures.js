@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 async function main(sql) {
     const data = yaml.load(fs.readFileSync(path.resolve(__dirname, "./fixtures.yaml"), "utf8"));
 
-    await sql`TRUNCATE auth.users, auth.sessions, auth.space_invitations, auth.invitations, auth.spaces, auth.space_users, main.resource_a, main.resource_b`;
+    await sql`TRUNCATE auth.audit_events, auth.users, auth.sessions, auth.space_invitations, auth.invitations, auth.spaces, auth.space_users, main.resource_a, main.resource_b`;
     await sql`
         ALTER SEQUENCE auth.invitations_id_seq RESTART WITH 1;
         ALTER SEQUENCE auth.spaces_id_seq RESTART WITH 1;
@@ -81,14 +81,15 @@ async function main(sql) {
     for await (const user of data.users) {
         await sql`
             SELECT auth.create_user(
-                _id         => ${user?.id || undefined},
-                _username   => ${user.username},
-                _first_name => ${user.first_name},
-                _last_name  => ${user.last_name},
-                _email      => ${user.email},
-                _password   => ${user.password},
-                _is_active  => TRUE,
-                _spaces     => ${user.spaces}
+                _id           => ${user?.id || undefined},
+                _username     => ${user.username},
+                _first_name   => ${user.first_name},
+                _last_name    => ${user.last_name},
+                _email        => ${user.email},
+                _password     => ${user.password},
+                _is_active    => TRUE,
+                _is_superuser => ${user?.is_superuser || false},
+                _spaces       => ${user.spaces}
             )->>'user_id' AS user_id;
         `;
     }

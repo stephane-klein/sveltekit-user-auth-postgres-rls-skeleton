@@ -10,7 +10,7 @@ export const actions = {
                 input_password=>${data.get("password")}
             )
         `)[0]?.authenticate;
-        if (authenticateResult.session_id !== null) {
+        if (authenticateResult.status_code === 200) {
             cookies.set("session", authenticateResult?.session_id, { path: "/" });
             throw redirect(302, "/");
         } else {

@@ -29,18 +29,33 @@ export const actions = {
                     })
                 }
                 RETURNING id
+            ),
+            _space_invitations AS (
+                INSERT INTO auth.space_invitations
+                (
+                    invitation_id,
+                    space_id,
+                    role
+                )
+                VALUES(
+                    (SELECT id FROM _invitation),
+                    ${locals.client.current_space.id},
+                    'space.MEMBER'
+                )
             )
-            INSERT INTO auth.space_invitations
-            (
-                invitation_id,
-                space_id,
-                role
-            )
-            VALUES(
-                (SELECT id FROM _invitation),
-                ${locals.client.current_space.id},
-                'space.MEMBER'
-            )
+            INSERT INTO auth.audit_events
+                (
+                    entity_type,
+                    entity_id,
+                    space_ids,
+                    event_type
+                )
+                VALUES(
+                    'auth.invitations',
+                    (SELECT id FROM _invitation),
+                    ${[locals.client.current_space.id]},
+                    'CREATED'
+                );
         `;
 
         const invitationUrl = new URL(request.url);

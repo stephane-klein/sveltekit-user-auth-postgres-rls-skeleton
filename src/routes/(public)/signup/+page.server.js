@@ -90,14 +90,15 @@ export const actions = {
         } else {
             result = (await locals.sql`
                 SELECT auth.create_user(
-                    _id         => null,
-                    _username   => ${data.get("username")},
-                    _first_name => ${data.get("first_name")},
-                    _last_name  => ${data.get("last_name")},
-                    _email      => ${data.get("email")},
-                    _password   => ${data.get("password")},
-                    _is_active  => true,
-                    _spaces     => ${[{
+                    _id           => null,
+                    _username     => ${data.get("username")},
+                    _first_name   => ${data.get("first_name")},
+                    _last_name    => ${data.get("last_name")},
+                    _email        => ${data.get("email")},
+                    _password     => ${data.get("password")},
+                    _is_active    => true,
+                    _is_superuser => false,
+                    _spaces       => ${[{
                         slug: data.get("space"),
                         role: 'space.MEMBER'
                     }]}
