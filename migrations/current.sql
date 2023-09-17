@@ -790,9 +790,7 @@ CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address)
 CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
 CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
 
-FUNC
-
-DROP PROCEDURE IF EXISTS auth.space_after_insert_row;
+DROP FUNCTION IF EXISTS auth.space_after_insert_row;
 CREATE FUNCTION auth.space_after_insert_row() RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO auth.audit_events
@@ -850,7 +848,7 @@ CREATE INDEX resource_a_updated_by_index ON main.resource_a (updated_by);
 CREATE INDEX resource_a_deleted_at_index ON main.resource_a (deleted_at);
 CREATE INDEX resource_a_deleted_by_index ON main.resource_a (deleted_by);
 
-DROP PROCEDURE IF EXISTS main.resource_a_after_insert_row;
+DROP FUNCTION IF EXISTS main.resource_a_after_insert_row;
 CREATE FUNCTION main.resource_a_after_insert_row() RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO auth.audit_events
@@ -904,7 +902,7 @@ CREATE INDEX resource_b_updated_by_index ON main.resource_b (updated_by);
 CREATE INDEX resource_b_deleted_at_index ON main.resource_b (deleted_at);
 CREATE INDEX resource_b_deleted_by_index ON main.resource_b (deleted_by);
 
-DROP PROCEDURE IF EXISTS main.resource_b_after_insert_row;
+DROP FUNCTION IF EXISTS main.resource_b_after_insert_row;
 CREATE FUNCTION main.resource_b_after_insert_row() RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO auth.audit_events
@@ -942,6 +940,93 @@ DO $$ BEGIN
         GRANT CONNECT ON DATABASE myapp TO webapp;
     END IF;
 END $$;
+
+DROP FUNCTION IF EXISTS auth.get_entity_details;
+CREATE OR REPLACE FUNCTION auth.get_entity_details(
+    entity_type auth.entity_types,
+    entity_id INTEGER
+) RETURNS JSONB
+LANGUAGE SQL
+AS $$
+    SELECT
+        CASE
+            WHEN entity_type = 'auth.users' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', username,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM auth.users
+                    LEFT JOIN auth.space_users
+                           ON users.id = space_users.user_id
+                    LEFT JOIN auth.spaces
+                           ON space_users.space_id = spaces.id
+                    WHERE users.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'main.resource_a' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', resource_a.title,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM main.resource_a
+                    LEFT JOIN auth.spaces
+                           ON resource_a.space_id = spaces.id
+                    WHERE resource_a.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'main.resource_b' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', resource_b.title,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM main.resource_b
+                    LEFT JOIN auth.spaces
+                           ON resource_b.space_id = spaces.id
+                    WHERE resource_b.id=entity_id
+                    LIMIT 1
+                )
+        END
+    ;
+$$;
+
+CREATE VIEW auth.view_audit_events AS
+    SELECT
+        TO_CHAR(audit_events.created_at, 'YYYY-MM-dd') AS created_at,
+        (
+            CASE
+                WHEN users.username IS NULL THEN
+                    'Anonymous'
+                ELSE
+                    users.username
+            END
+        ) AS author_username,
+        audit_events.author_id AS author_id,
+        audit_events.event_type,
+        audit_events.entity_type,
+        audit_events.entity_id,
+        (
+            auth.get_entity_details(
+                audit_events.entity_type,
+                audit_events.entity_id
+            )
+        ) AS entity_details,
+
+        audit_events.ipv4_address,
+        audit_events.ipv6_address
+    FROM
+        auth.audit_events
+    LEFT JOIN auth.users
+           ON audit_events.author_id=users.id
+    ORDER BY created_at DESC;
 
 GRANT ALL ON SCHEMA utils TO application_user;
 GRANT ALL ON SCHEMA auth TO application_user;
