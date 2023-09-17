@@ -91,6 +91,7 @@ CREATE TABLE auth.sessions(
 CREATE INDEX sessions_user_id_index ON auth.sessions (user_id);
 CREATE INDEX sessions_impersonate_user_id_index ON auth.sessions (impersonate_user_id);
 
+DROP FUNCTION IF EXISTS auth.create_session;
 CREATE OR REPLACE FUNCTION auth.create_session(
     input_user_id INTEGER
 ) RETURNS UUID
@@ -788,6 +789,8 @@ CREATE INDEX audit_events_entity_id_index    ON auth.audit_events (entity_id);
 CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
 CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
 CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
+
+FUNC
 
 DROP PROCEDURE IF EXISTS auth.space_after_insert_row;
 CREATE FUNCTION auth.space_after_insert_row() RETURNS TRIGGER AS $$
