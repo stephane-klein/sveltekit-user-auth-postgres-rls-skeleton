@@ -12,7 +12,7 @@
             <strong>{data.current_space.role}</strong>
             role on
             <a href={`/spaces/${data.current_space.slug}/`}>{data.current_space.title}</a>
-            {#if data?.impersonated}
+            {#if data?.impersonated_by}
                 (Impersonated by
                 {data?.impersonated_by?.username}
                 |

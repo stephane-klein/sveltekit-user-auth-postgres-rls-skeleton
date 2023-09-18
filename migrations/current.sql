@@ -691,60 +691,6 @@ AS $$
         );
 $$;
 
-DROP FUNCTION IF EXISTS auth.impersonate;
-CREATE FUNCTION auth.impersonate(_username VARCHAR) RETURNS JSON
-LANGUAGE 'plpgsql' SECURITY DEFINER
-AS $$
-DECLARE
-    _user_id INTEGER;
-BEGIN
-    WITH _my_admin_or_owner_spaces AS (
-        SELECT space_id
-        FROM auth.space_users
-        WHERE
-            (user_id = CURRENT_SETTING('auth.user_id', TRUE)::INTEGER) AND
-            (role = ANY(ARRAY['space.ADMIN', 'space.OWNER']::auth.roles[]))
-    )
-    SELECT
-        user_id INTO _user_id
-    FROM
-        auth.space_users
-    INNER JOIN auth.users
-            ON space_users.user_id = users.id
-    INNER JOIN _my_admin_or_owner_spaces
-            ON _my_admin_or_owner_spaces.space_id = space_users.space_id
-         WHERE users.username = _username;
-
-    IF (_user_id IS NULL) THEN
-        RETURN (
-            SELECT json_build_object(
-                'status_code', 401,
-                'status', 'Either the user ' || _username || 'does not exist, or you are not authorized to play him.'
-            )
-        );
-    ELSE
-        UPDATE auth.sessions
-        SET impersonate_user_id=_user_id
-        WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
-        RETURN (
-            SELECT json_build_object(
-                'status_code', 200,
-                'status', 'You impersonate ' || _username || ' with success'
-            )
-        );
-    END IF;
-END;
-$$;
-
-DROP FUNCTION IF EXISTS auth.exit_impersonate;
-CREATE FUNCTION auth.exit_impersonate() RETURNS VOID
-LANGUAGE sql SECURITY DEFINER
-AS $$
-    UPDATE auth.sessions
-       SET impersonate_user_id=NULL
-     WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
-$$;
-
 DROP TYPE IF EXISTS auth.entity_types;
 CREATE TYPE auth.entity_types AS ENUM (
     'auth.users',
@@ -764,11 +710,14 @@ CREATE TYPE auth.audit_event_types AS ENUM (
     'user.LOGIN_FAILED_BAD_PASSWORD',
     'user.SIGNUP',
     'user.LOGOUT',
+    'user.ENTER_IMPERSONATE',
+    'user.EXIT_IMPERSONATE',
     'CREATED',
     'DESTROYED',
     'UPDATED',
     'CLOSED'
 );
+
 
 DROP TABLE IF EXISTS auth.audit_events CASCADE;
 CREATE TABLE auth.audit_events (
@@ -820,6 +769,102 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+DROP FUNCTION IF EXISTS auth.impersonate;
+CREATE FUNCTION auth.impersonate(_username VARCHAR) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _user_id INTEGER;
+BEGIN
+    RAISE NOTICE '_username %', _username;
+    WITH _my_admin_or_owner_spaces AS (
+        SELECT space_id
+        FROM auth.space_users
+        WHERE
+            (user_id = CURRENT_SETTING('auth.user_id', TRUE)::INTEGER) AND
+            (role = ANY(ARRAY['space.ADMIN', 'space.OWNER']::auth.roles[]))
+    )
+    SELECT
+        user_id INTO _user_id
+    FROM
+        auth.space_users
+    INNER JOIN auth.users
+            ON space_users.user_id = users.id
+    INNER JOIN _my_admin_or_owner_spaces
+            ON _my_admin_or_owner_spaces.space_id = space_users.space_id
+         WHERE users.username = _username;
+
+    RAISE NOTICE '_user_id %', _user_id;
+
+    IF (_user_id IS NULL) THEN
+        RETURN (
+            SELECT json_build_object(
+                'status_code', 401,
+                'status', 'Either the user ' || _username || 'does not exist, or you are not authorized to impersonate him.'
+            )
+        );
+    ELSE
+        UPDATE auth.sessions
+        SET impersonate_user_id=_user_id
+        WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                _user_id,
+                'user.ENTER_IMPERSONATE',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+                )
+            );
+
+        RAISE NOTICE 'success';
+        RETURN (
+            SELECT json_build_object(
+                'status_code', 200,
+                'status', 'You impersonate ' || _username || ' with success'
+            )
+        );
+    END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS auth.exit_impersonate;
+CREATE FUNCTION auth.exit_impersonate() RETURNS VOID
+LANGUAGE sql SECURITY DEFINER
+AS $$
+    UPDATE auth.sessions
+       SET impersonate_user_id=NULL
+     WHERE id=CURRENT_SETTING('auth.session_id', TRUE)::UUID;
+
+    INSERT INTO auth.audit_events
+        (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',
+            (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
+            'user.EXIT_IMPERSONATE',
+            (
+                SELECT ARRAY_AGG(space_id)
+                FROM auth.space_users
+                WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+            )
+        );
+$$;
 
 DROP FUNCTION IF EXISTS auth.logout;
 CREATE FUNCTION auth.logout() RETURNS VOID
