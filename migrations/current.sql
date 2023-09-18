@@ -7,6 +7,7 @@ CREATE SCHEMA IF NOT EXISTS utils;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA utils;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA utils;
+CREATE EXTENSION IF NOT EXISTS "intarray" WITH SCHEMA utils;
 
 -- Helper section
 
@@ -132,6 +133,7 @@ BEGIN
             (
                 entity_type,
                 entity_id,
+                space_id,
                 event_type,
                 details
             )
@@ -196,12 +198,18 @@ BEGIN
         INSERT INTO auth.audit_events (
             entity_type,
             entity_id,
-            event_type
+            event_type,
+            space_ids
         )
         VALUES(
             'auth.users',
             _user.id,
-            'user.LOGIN_SUCCESS'
+            'user.LOGIN_SUCCESS',
+            (
+                SELECT ARRAY_AGG(space_id)
+                FROM auth.space_users
+                WHERE user_id = _user.id
+            )
         )
     ),
     _update AS (
@@ -773,6 +781,8 @@ CREATE TABLE auth.audit_events (
     created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     entity_type            auth.entity_types DEFAULT NULL,
     entity_id              INTEGER DEFAULT NULL,
+    space_ids              INTEGER[] DEFAULT NULL,
+
     ipv4_address VARCHAR
         DEFAULT (NULLIF(CURRENT_SETTING('auth.ipv4_address', TRUE), '')),
 
@@ -786,6 +796,7 @@ CREATE INDEX audit_events_author_id_index    ON auth.audit_events (author_id);
 CREATE INDEX audit_events_created_at_index   ON auth.audit_events (created_at);
 CREATE INDEX audit_events_entity_type_index  ON auth.audit_events (entity_type);
 CREATE INDEX audit_events_entity_id_index    ON auth.audit_events (entity_id);
+CREATE INDEX audit_events_space_ids_index    ON auth.audit_events USING GIST (space_ids utils.gist__int_ops);
 CREATE INDEX audit_events_ipv4_address_index ON auth.audit_events (ipv4_address);
 CREATE INDEX audit_events_ipv6_address_index ON auth.audit_events (ipv6_address);
 CREATE INDEX audit_events_event_type_index   ON auth.audit_events (event_type);
@@ -797,12 +808,14 @@ BEGIN
     (
         entity_type,
         entity_id,
-        event_type
+        event_type,
+        space_ids
     )
     VALUES (
         'auth.spaces',
         NEW.id,
-        'CREATED'
+        'CREATED',
+        ARRAY[NEW.id]
     );
     RETURN NEW;
 END;
@@ -855,12 +868,14 @@ BEGIN
     (
         entity_type,
         entity_id,
-        event_type
+        event_type,
+        space_ids
     )
     VALUES (
         'main.resource_a',
         NEW.id,
-        'CREATED'
+        'CREATED',
+        ARRAY[NEW.space_id]
     );
     RETURN NEW;
 END;
@@ -909,12 +924,14 @@ BEGIN
     (
         entity_type,
         entity_id,
-        event_type
+        event_type,
+        space_ids
     )
     VALUES (
         'main.resource_b',
         NEW.id,
-        'CREATED'
+        'CREATED',
+        ARRAY[NEW.space_id]
     );
     RETURN NEW;
 END;
@@ -1041,6 +1058,7 @@ ALTER TABLE auth.invitations       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.space_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.spaces            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth.space_users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth.audit_events      ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE main.resource_a ENABLE ROW LEVEL SECURITY;
 ALTER TABLE main.resource_b ENABLE ROW LEVEL SECURITY;
@@ -1167,6 +1185,20 @@ CREATE POLICY invitation_write
     TO application_user
     WITH CHECK (
         invitations.invited_by=(NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+    );
+
+CREATE POLICY audit_events_read
+    ON auth.audit_events
+    AS PERMISSIVE
+    FOR SELECT
+    TO application_user
+    USING(
+        (
+            REGEXP_SPLIT_TO_ARRAY(
+                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
+                ','
+            )::INTEGER[]
+        ) && space_ids
     );
 
 CREATE POLICY resource_a_read
