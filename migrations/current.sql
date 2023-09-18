@@ -100,7 +100,7 @@ LANGUAGE SQL
 AS $$
     DELETE FROM auth.sessions WHERE user_id = input_user_id;
     INSERT INTO auth.sessions (user_id) VALUES (input_user_id) RETURNING sessions.id;
-$$;;
+$$;
 
 DROP FUNCTION IF EXISTS auth.authenticate;
 CREATE FUNCTION auth.authenticate(
@@ -821,6 +821,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP FUNCTION IF EXISTS auth.logout;
+CREATE FUNCTION auth.logout() RETURNS VOID
+LANGUAGE SQL
+AS $$
+    INSERT INTO auth.audit_events
+    (
+        entity_type,
+        entity_id,
+        event_type,
+        space_ids
+    )
+    VALUES(
+        'auth.users',
+        (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
+        'user.LOGOUT',
+        (
+            SELECT ARRAY_AGG(space_id)
+            FROM auth.space_users
+            WHERE user_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER
+        )
+    );
+$$;
+
 CREATE TRIGGER space_after_insert
     AFTER INSERT ON auth.spaces
     FOR EACH ROW
@@ -1017,7 +1040,7 @@ $$;
 
 CREATE VIEW auth.view_audit_events AS
     SELECT
-        TO_CHAR(audit_events.created_at, 'YYYY-MM-dd') AS created_at,
+        TO_CHAR(audit_events.created_at, 'YYYY-MM-dd HH24:MI:SS') AS created_at,
         (
             CASE
                 WHEN users.username IS NULL THEN
@@ -1199,6 +1222,16 @@ CREATE POLICY audit_events_read
                 ','
             )::INTEGER[]
         ) && space_ids
+    );
+
+CREATE POLICY audit_events_write
+    ON auth.audit_events
+    AS PERMISSIVE
+    FOR INSERT
+    TO application_user
+    WITH CHECK (
+        (audit_events.author_id IS NULL) OR
+        (audit_events.author_id = (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER)
     );
 
 CREATE POLICY resource_a_read
