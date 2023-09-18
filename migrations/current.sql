@@ -133,12 +133,13 @@ BEGIN
             (
                 entity_type,
                 entity_id,
-                space_id,
+                space_ids,
                 event_type,
                 details
             )
             VALUES(
                 'auth.users',
+                NULL,
                 NULL,
                 'user.LOGIN_FAILED_USER_NOT_FOUND',
                 JSONB_BUILD_OBJECT(
@@ -390,12 +391,21 @@ BEGIN
         INSERT INTO auth.audit_events (
             entity_type,
             entity_id,
-            event_type
+            event_type,
+            space_ids
         )
         VALUES(
             'auth.users',                   -- entity_type
             (SELECT id FROM _user LIMIT 1), -- entity_id
-            'CREATED'                       -- event_type
+            'user.SIGNUP',                  -- event_type
+            (
+                SELECT
+                    ARRAY_AGG(spaces.id)
+                FROM
+                    JSONB_TO_RECORDSET(_spaces) AS _space_records(slug VARCHAR, role auth.roles)
+                INNER JOIN auth.spaces
+                        ON _space_records.slug = spaces.slug
+            )
         )
     )
     SELECT json_build_object(
