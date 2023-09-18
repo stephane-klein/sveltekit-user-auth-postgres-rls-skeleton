@@ -549,6 +549,27 @@ BEGIN
         UPDATE auth.invitations
            SET user_id=(SELECT id FROM _user LIMIT 1)
          WHERE id=_invitation_id
+    ),
+    _audit_events AS (
+        INSERT INTO auth.audit_events (
+            entity_type,
+            entity_id,
+            event_type,
+            space_ids
+        )
+        VALUES(
+            'auth.users',                   -- entity_type
+            (SELECT id FROM _user LIMIT 1), -- entity_id
+            'user.INVITATION_SIGNUP',       -- event_type
+            (
+                SELECT
+                    ARRAY_AGG(space_invitations.space_id)
+                FROM
+                    auth.space_invitations
+                WHERE
+                    space_invitations.invitation_id=_invitation_id
+            )
+        )
     )
     SELECT
         JSON_BUILD_OBJECT(
@@ -719,6 +740,7 @@ CREATE TYPE auth.audit_event_types AS ENUM (
     'user.LOGIN_FAILED_USER_NOT_FOUND',
     'user.LOGIN_FAILED_BAD_PASSWORD',
     'user.SIGNUP',
+    'user.INVITATION_SIGNUP',
     'user.LOGOUT',
     'user.ENTER_IMPERSONATE',
     'user.EXIT_IMPERSONATE',
@@ -788,7 +810,6 @@ AS $$
 DECLARE
     _user_id INTEGER;
 BEGIN
-    RAISE NOTICE '_username %', _username;
     WITH _my_admin_or_owner_spaces AS (
         SELECT space_id
         FROM auth.space_users
@@ -805,8 +826,6 @@ BEGIN
     INNER JOIN _my_admin_or_owner_spaces
             ON _my_admin_or_owner_spaces.space_id = space_users.space_id
          WHERE users.username = _username;
-
-    RAISE NOTICE '_user_id %', _user_id;
 
     IF (_user_id IS NULL) THEN
         RETURN (
@@ -838,7 +857,6 @@ BEGIN
                 )
             );
 
-        RAISE NOTICE 'success';
         RETURN (
             SELECT json_build_object(
                 'status_code', 200,
@@ -1059,6 +1077,22 @@ AS $$
                     LEFT JOIN auth.spaces
                            ON space_users.space_id = spaces.id
                     WHERE users.id=entity_id
+                    LIMIT 1
+                )
+            WHEN entity_type = 'auth.invitations' THEN
+                (
+                    SELECT
+                        JSONB_BUILD_OBJECT(
+                            'caption', invitations.email,
+                            'space_title', spaces.title,
+                            'space_id', spaces.id
+                        )
+                    FROM auth.invitations
+                    LEFT JOIN auth.space_invitations
+                           ON invitations.id = space_invitations.invitation_id
+                    LEFT JOIN auth.spaces
+                           ON space_invitations.space_id = spaces.id
+                    WHERE invitations.id=entity_id
                     LIMIT 1
                 )
             WHEN entity_type = 'main.resource_a' THEN
