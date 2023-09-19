@@ -744,6 +744,8 @@ CREATE TYPE auth.audit_event_types AS ENUM (
     'user.LOGOUT',
     'user.ENTER_IMPERSONATE',
     'user.EXIT_IMPERSONATE',
+    'user.RESET_PASSWORD_ASKED',
+    'user.PASSWORD_CHANGED',
     'CREATED',
     'DESTROYED',
     'UPDATED',
@@ -916,6 +918,94 @@ AS $$
         )
     );
 $$;
+
+DROP FUNCTION IF EXISTS auth.anonymous_user_ask_reset_password;
+CREATE FUNCTION auth.anonymous_user_ask_reset_password(_email VARCHAR) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _result JSON;
+BEGIN
+    SELECT
+        JSONB_BUILD_OBJECT(
+            'id', users.id,
+            'email', users.email
+        ) INTO _result
+    FROM auth.users
+    WHERE email=_email;
+
+    IF (_result->'id' IS NOT NULL) THEN
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                (_result->>'id')::INTEGER,
+                'user.RESET_PASSWORD_ASKED',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (_result->>'id')::INTEGER
+                )
+            );
+    END IF;
+
+    RETURN _result;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS auth.anonymous_user_change_password;
+CREATE FUNCTION auth.anonymous_user_change_password(_email VARCHAR, _password VARCHAR) RETURNS JSON
+LANGUAGE 'plpgsql' SECURITY DEFINER
+AS $$
+DECLARE
+    _user_id INTEGER;
+BEGIN
+    UPDATE auth.users
+        SET password=utils.CRYPT(TRIM(_password), utils.GEN_SALT('bf', 8))
+        WHERE email=_email
+        RETURNING id INTO _user_id;
+
+    IF (_user_id IS NOT NULL) THEN
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES(
+                'auth.users',
+                _user_id,
+                'user.PASSWORD_CHANGED',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = _user_id
+                )
+            );
+
+            RETURN (
+                SELECT json_build_object(
+                    'status_code', 200,
+                    'status', 'Password changed'
+                )
+            );
+    END IF;
+
+    RETURN (
+        SELECT json_build_object(
+            'status_code', 404,
+            'status', 'User not found'
+        )
+    );
+END;
+$$;
+
 
 CREATE TRIGGER space_after_insert
     AFTER INSERT ON auth.spaces

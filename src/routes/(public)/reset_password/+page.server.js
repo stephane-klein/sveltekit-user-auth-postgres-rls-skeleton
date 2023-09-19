@@ -3,13 +3,15 @@ import jwt from "jsonwebtoken";
 import mail from "$lib/server/mail.js";
 
 export const actions = {
-    default: async({ request }) => {
+    default: async({ locals, request }) => {
         const data = await request.formData();
-        const user = await locals.sql`SELECT * FROM auth.users WHERE email=${data.get("email")}`;
+        const userResult = (await locals.sql`SELECT auth.anonymous_user_ask_reset_password(${data.get("email")}) AS user`)[0].user;
 
-        if (user.length === 1) {
+        if (userResult.id) {
             const token = jwt.sign(
-                {subject: user[0].id},
+                {
+                    user: userResult
+                },
                 process.env.SECRET || "secret",
                 { expiresIn: "30m" }
             );
