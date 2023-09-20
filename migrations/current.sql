@@ -40,6 +40,7 @@ CREATE TABLE auth.users (
     is_superuser           BOOLEAN DEFAULT FALSE,
     is_serviceuser         BOOLEAN DEFAULT FALSE,
     last_login             TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    last_seen              TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     date_joined            TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
@@ -55,6 +56,7 @@ CREATE INDEX users_last_name_index   ON auth.users (last_name);
 CREATE INDEX users_email_index       ON auth.users (email);
 CREATE INDEX users_is_active_index   ON auth.users (is_active);
 CREATE INDEX users_last_login_index  ON auth.users (last_login);
+CREATE INDEX users_last_seen_index   ON auth.users (last_seen);
 CREATE INDEX users_date_joined_index ON auth.users (date_joined);
 CREATE INDEX users_created_at_index  ON auth.users (created_at);
 CREATE INDEX users_updated_at_index  ON auth.users (updated_at);
@@ -603,6 +605,7 @@ BEGIN
             users.email,
             users.is_active,
             users.last_login,
+            users.last_seen,
             users.date_joined,
             users.created_at,
             users.updated_at
@@ -666,6 +669,72 @@ BEGIN
             )
         ) INTO _response
     ;
+
+    IF (
+        (_response->>'impersonated_by' IS NOT NULL) AND
+        (
+            COALESCE(
+                (_response->'impersonated_by'->>'last_seen')::TIMESTAMP,
+                DATE('1900-01-01')
+            )
+            < (NOW() - INTERVAL '1' MINUTE)
+        )
+    ) THEN
+        UPDATE auth.users
+        SET last_seen = NOW()
+        WHERE
+            (users.id = (_response->'impersonated_by'->>'id')::INTEGER);
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES (
+                'auth.users',
+                (_response->'impersonated_by'->>'id')::INTEGER,
+                'user.SEEN',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (_response->'impersonated_by'->>'id')::INTEGER
+                )
+            );
+    ELSIF (
+        (_response->>'user' IS NOT NULL) AND
+        (
+            COALESCE(
+                (_response->'user'->>'last_seen')::TIMESTAMP,
+                DATE('1900-01-01')
+            )
+            < (NOW() - INTERVAL '1' MINUTE)
+        )
+    ) THEN
+        UPDATE auth.users
+        SET last_seen = NOW()
+        WHERE
+            (users.id = (_response->'user'->>'id')::INTEGER);
+
+        INSERT INTO auth.audit_events
+            (
+                entity_type,
+                entity_id,
+                event_type,
+                space_ids
+            )
+            VALUES (
+                'auth.users',
+                (_response->'user'->>'id')::INTEGER,
+                'user.SEEN',
+                (
+                    SELECT ARRAY_AGG(space_id)
+                    FROM auth.space_users
+                    WHERE user_id = (_response->'user'->>'id')::INTEGER
+                )
+            );
+    END IF;
 
     PERFORM
         SET_CONFIG(
@@ -735,6 +804,7 @@ CREATE TYPE auth.entity_types AS ENUM (
 
 DROP TYPE IF EXISTS auth.audit_event_types;
 CREATE TYPE auth.audit_event_types AS ENUM (
+    'user.SEEN',
     'user.LOGIN_SUCCESS',
     'user.LOGIN_FAILED_USER_DEACTIVATE',
     'user.LOGIN_FAILED_USER_NOT_FOUND',
