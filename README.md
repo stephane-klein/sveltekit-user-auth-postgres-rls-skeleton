@@ -57,6 +57,34 @@ Tooling:
 - ✅ [pnpm](https://pnpm.io/)
 - ✅ [Jest](https://jestjs.io/) for unittest
 
+## Development time and costs
+
+The `2023-09-12`, until commit [`3db763a`](https://github.com/stephane-klein/sveltekit-user-auth-postgres-rls-skeleton/commit/3db763a3bac1718efc56f48a08567c9f56347d70), I spent 56 hours and 20 mintes on this project (The time spent on [`sveltekit-user-auth-skeleton`](https://github.com/stephane-klein/sveltekit-user-auth-skeleton) project has been included in this time (15 hours and 28 minutes)).<br />
+This time was measured with a chronometer, which is deep work.<br />
+I consider that a "normal" working day corresponds to a maximum of 4 hours of deep work.
+
+This work would correspond to the following price:
+
+- For a French developer on a permanent contract at 65 K€ gross per year: 6555 € (total cost paid by the employer)
+- For a freelance developer at 600 € per day: 9000 € (total cost invoiced by the freelance)
+
+<details>
+  <summary>See details</summary>
+
+```sh
+$ python
+>>> import math
+>>> french_developer_on_a_permanent_contract = math.ceil(56.5/4) * 437
+>>> french_developer_on_a_permanent_contract
+1748
+>>> freelance = math.ceil(56.5/4) * 600
+>>> freelance
+2400
+>>>
+```
+
+</details>
+
 ## Getting started
 
 ```sh
