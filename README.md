@@ -31,6 +31,32 @@ Next tasks on the roadmap:
 - Improve unit tests
 - Implement end2end tests
 
+Opinions:
+
+- No ORM pattern
+- The security layer, i.e. permission control is implemented by PostgreSQL [Row-Level Security](https://www.postgresql.org/docs/16/ddl-rowsecurity.html)
+- `impersonate_user_id` is stored in `auth.sessions` table (this can be challenged)
+- I'm trying to move towards [Radical Simplicity](https://www.radicalsimpli.city/)
+- [Don’t Build A General Purpose API To Power Your Own Front End](https://max.engineer/server-informed-ui)
+- The page rendering spped, and therefore the execution speed of SQL queries, needs special attention
+
+Components and libraries:
+
+- ✅ [SSR](https://kit.svelte.dev/docs/page-options#ssr) [SvelteKit](https://github.com/sveltejs/kit) with [Hydration](https://kit.svelte.dev/docs/glossary#hydration)
+- ✅ PostgreSQL database server
+- ✅ [Postgres.js](https://github.com/porsager/postgres) - PostgreSQL client for Node.js
+- ✅ Migration powered by [graphile-migrate](https://github.com/graphile/migrate)
+- ✅ Token generated with [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken)
+- ✅PostgreSQL [Row-Level Security](https://www.postgresql.org/docs/16/ddl-rowsecurity.html)
+
+Tooling:
+
+- ✅ [asdf](https://asdf-vm.com/)
+- ✅ [Docker](<https://en.wikipedia.org/wiki/Docker_(software)>) and [Docker Compose](https://docs.docker.com/compose/)
+- ✅ [NodeJS](https://nodejs.org/en/)
+- ✅ [pnpm](https://pnpm.io/)
+- ✅ [Jest](https://jestjs.io/) for unittest
+
 ## Getting started
 
 ```sh
