@@ -59,7 +59,7 @@ Tooling:
 
 ## Development time and costs
 
-The `2023-09-12`, until commit [`3db763a`](https://github.com/stephane-klein/sveltekit-user-auth-postgres-rls-skeleton/commit/3db763a3bac1718efc56f48a08567c9f56347d70), I spent 56 hours and 20 mintes on this project (The time spent on [`sveltekit-user-auth-skeleton`](https://github.com/stephane-klein/sveltekit-user-auth-skeleton) project has been included in this time (15 hours and 28 minutes)).<br />
+The `2023-09-21`, until commit [`3db763a`](https://github.com/stephane-klein/sveltekit-user-auth-postgres-rls-skeleton/commit/3db763a3bac1718efc56f48a08567c9f56347d70), I spent 56 hours and 20 mintes on this project (The time spent on [`sveltekit-user-auth-skeleton`](https://github.com/stephane-klein/sveltekit-user-auth-skeleton) project has been included in this time (15 hours and 28 minutes)).<br />
 This time was measured with a chronometer, which is deep work.<br />
 I consider that a "normal" working day corresponds to a maximum of 4 hours of deep work.
 
