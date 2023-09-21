@@ -752,6 +752,11 @@ BEGIN
             FALSE
         ),
         SET_CONFIG(
+            'auth.impersonated_by_id',
+            _response->'impersonated_by'->>'id'::VARCHAR,
+            FALSE
+        ),
+        SET_CONFIG(
             'auth.spaces',
             (
                 CASE
@@ -953,12 +958,14 @@ AS $$
 
     INSERT INTO auth.audit_events
         (
+            author_id,
             entity_type,
             entity_id,
             event_type,
             space_ids
         )
         VALUES(
+            (NULLIF(CURRENT_SETTING('auth.impersonated_by_id', TRUE), ''))::INTEGER,
             'auth.users',
             (NULLIF(CURRENT_SETTING('auth.user_id', TRUE), ''))::INTEGER,
             'user.EXIT_IMPERSONATE',
