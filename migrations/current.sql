@@ -677,7 +677,7 @@ BEGIN
                 (_response->'impersonated_by'->>'last_seen')::TIMESTAMP,
                 DATE('1900-01-01')
             )
-            < (NOW() - INTERVAL '1' MINUTE)
+            < (NOW() - INTERVAL '2' MINUTE)
         )
     ) THEN
         UPDATE auth.users
@@ -709,7 +709,7 @@ BEGIN
                 (_response->'user'->>'last_seen')::TIMESTAMP,
                 DATE('1900-01-01')
             )
-            < (NOW() - INTERVAL '1' MINUTE)
+            < (NOW() - INTERVAL '2' MINUTE)
         )
     ) THEN
         UPDATE auth.users
