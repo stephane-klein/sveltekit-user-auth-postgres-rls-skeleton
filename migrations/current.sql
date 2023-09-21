@@ -687,12 +687,14 @@ BEGIN
 
         INSERT INTO auth.audit_events
             (
+                author_id,
                 entity_type,
                 entity_id,
                 event_type,
                 space_ids
             )
             VALUES (
+                (_response->'impersonated_by'->>'id')::INTEGER,
                 'auth.users',
                 (_response->'impersonated_by'->>'id')::INTEGER,
                 'user.SEEN',
@@ -719,12 +721,14 @@ BEGIN
 
         INSERT INTO auth.audit_events
             (
+                author_id,
                 entity_type,
                 entity_id,
                 event_type,
                 space_ids
             )
             VALUES (
+                (_response->'user'->>'id')::INTEGER,
                 'auth.users',
                 (_response->'user'->>'id')::INTEGER,
                 'user.SEEN',
