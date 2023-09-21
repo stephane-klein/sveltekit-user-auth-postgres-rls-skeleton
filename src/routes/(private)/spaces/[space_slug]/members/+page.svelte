@@ -2,6 +2,7 @@
     import { page } from "$app/stores";
 
     export let data;
+    console.log(data);
 </script>
 
 <p>
@@ -29,7 +30,11 @@
                 <td>{member.role}</td>
                 <td>{member.last_login}</td>
                 <td>{member.created_at}</td>
-                <td><a href={`/impersonate/${member.username}/?redirect=${$page.url}`}>impersonate</a></td>
+                <td>
+                    {#if ["space.OWNER", "space.ADMIN"].includes(data.current_space.role)}
+                        <a href={`/impersonate/${member.username}/?redirect=${$page.url}`}>impersonate</a>
+                    {/if}
+                </td>
             </tr>
         {/each}
     </tbody>
