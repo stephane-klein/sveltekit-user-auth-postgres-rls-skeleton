@@ -666,6 +666,30 @@ BEGIN
                     ELSE
                         NULL
                 END
+            ),
+            'spaces_admin', (
+                CASE
+                    WHEN ((SELECT COUNT(*) FROM _impersonate_user) > 0) THEN
+                        (
+                            SELECT ARRAY_AGG(space_id)
+                            FROM auth.space_users
+                            WHERE (
+                                (user_id = (SELECT id FROM _impersonate_user LIMIT 1)) AND
+                                (role = ANY(ARRAY['space.ADMIN'::auth.roles, 'space.OWNER'::auth.roles]))
+                            )
+                        )
+                    WHEN ((SELECT COUNT(*) FROM _user) > 0) THEN
+                        (
+                            SELECT ARRAY_AGG(space_id)
+                            FROM auth.space_users
+                            WHERE (
+                                (user_id = (SELECT id FROM _user LIMIT 1)) AND
+                                (role = ANY(ARRAY['space.ADMIN'::auth.roles, 'space.OWNER'::auth.roles]))
+                            )
+                        )
+                    ELSE
+                        NULL
+                END
             )
         ) INTO _response
     ;
@@ -766,6 +790,23 @@ BEGIN
                         ARRAY_TO_STRING(
                             ARRAY(
                                 SELECT JSONB_ARRAY_ELEMENTS(_response->'spaces')
+                            ),
+                            ','
+                        )
+                END
+            ),
+            FALSE
+        ),
+        SET_CONFIG(
+            'auth.spaces_admin',
+            (
+                CASE
+                    WHEN _response->>'spaces_admin' IS NULL THEN
+                        ''
+                    ELSE
+                        ARRAY_TO_STRING(
+                            ARRAY(
+                                SELECT JSONB_ARRAY_ELEMENTS(_response->'spaces_admin')
                             ),
                             ','
                         )
@@ -1298,8 +1339,9 @@ AS $$
     ;
 $$;
 
-CREATE VIEW auth.view_audit_events AS
-    SELECT
+CREATE VIEW auth.view_audit_events
+    WITH (security_invoker=TRUE)
+    AS SELECT
         TO_CHAR(audit_events.created_at, 'YYYY-MM-dd HH24:MI:SS') AS created_at,
         (
             CASE
@@ -1478,7 +1520,7 @@ CREATE POLICY audit_events_read
     USING(
         (
             REGEXP_SPLIT_TO_ARRAY(
-                NULLIF(CURRENT_SETTING('auth.spaces', TRUE), ''),
+                NULLIF(CURRENT_SETTING('auth.spaces_admin', TRUE), ''),
                 ','
             )::INTEGER[]
         ) && space_ids

@@ -22,8 +22,10 @@
         {/if}
         |
         <a data-sveltekit-reload href="/spaces/">Spaces</a>
-        |
-        <a data-sveltekit-reload href="/audit-events/">Audit events</a>
+        {#if data.current_space && ["space.OWNER", "space.ADMIN"].includes(data.current_space.role)}
+            |
+            <a data-sveltekit-reload href="/audit-events/">Audit events</a>
+        {/if}
         |
         <a data-sveltekit-reload href="/logout/">Logout</a>
     </p>
