@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   postgres:
-    image: postgres:15
+    image: postgres:16
     restart: unless-stopped
     ports:
       - 5432:5432
@@ -18,7 +18,7 @@ services:
       start_period: 30s
 
   postgres-test:
-    image: postgres:15
+    image: postgres:16
     environment:
       POSTGRES_USER: postgrestest
       POSTGRES_DB: postgrestest
