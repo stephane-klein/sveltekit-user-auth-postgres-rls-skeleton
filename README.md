@@ -1,6 +1,8 @@
 # SvelteKit SSR user auth PostgreSQL RLS skeleton
 
-Status : work in progress
+I hope to use this skeleton as a foundation to integrate user authentication, with _workspace/groupspace_ support in SvelteKit web app.
+
+Status : I think it's stable, but it hasn't been tested in production.
 
 This project is a spin-off of [`sveltekit-user-auth-skeleton`](https://github.com/stephane-klein/sveltekit-user-auth-skeleton).
 
@@ -8,6 +10,26 @@ Repository starting point issue (in French): https://github.com/stephane-klein/s
 
 In a real project, the tables `main.resource_a` and `main.resource_b` should be replaced by `products`, `issues`,
 `customers`, `invoices`… entities.
+
+Features:
+
+- User login
+- User signup
+- User signup by invitation
+- User password reset support
+- User impersonate support for staff user
+- User role support
+- Space resource support, to implement _workspace_ or _groupspace_, multitenancy
+- A user can belong to one or more spaces
+- A space can belong to another space
+- Permission control implemented in PostgreSQL using [Row-Level Security](https://www.postgresql.org/docs/16/ddl-rowsecurity.html)
+- The data model has been designed with performance in mind, i.e. the `POLICY` query plans have been reviewed to ensure that the best indexes are used (I'm not claiming that everything is perfect at the moment, but this is one of the main objectives of this project)
+- Audit events support
+
+Next tasks on the roadmap:
+
+- Improve unit tests
+- Implement end2end tests
 
 ## Getting started
 
