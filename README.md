@@ -4,6 +4,8 @@ I hope to use this skeleton as a foundation to integrate user authentication, wi
 
 Status : I think it's stable, but it hasn't been tested in production.
 
+[Screencast project presentation](https://youtu.be/jeJwmlesxzk?si=BOrrG5PWTYGsKLLN) (audio in french)
+
 This project is a spin-off of [`sveltekit-user-auth-skeleton`](https://github.com/stephane-klein/sveltekit-user-auth-skeleton).
 
 Repository starting point issue (in French): https://github.com/stephane-klein/sveltekit-user-auth-skeleton/issues/7
