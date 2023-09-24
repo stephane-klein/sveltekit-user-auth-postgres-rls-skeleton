@@ -1475,7 +1475,7 @@ CREATE POLICY space_invitation_write
                 auth.space_users
             WHERE
                 (user_id=NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER) AND
-                (role IN ('space.ADMIN', 'space.OWNER'))
+                (role = ANY(ARRAY['space.ADMIN'::auth.roles, 'space.OWNER'::auth.roles]))
         )
     );
 
