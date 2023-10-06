@@ -263,6 +263,46 @@ describe("When admin john-doe1 is connected", () => {
 
         sql.end();
     });
+    it("john-doe1 should be able to update his own user fields", async() => {
+        sql = postgres(
+            "postgres://webapp:password@localhost:5433/myapp"
+        );
+        await fixture(sqlFixture);
+        const sessionId = (await sql`
+            SELECT (auth.authenticate(
+                input_username := 'john-doe1',
+                input_email := NULL,
+                input_password := 'secret1'
+            ) ->> 'session_id')::UUID AS session_id
+        `)[0].session_id;
+        await sql`SELECT auth.open_session(${sessionId})`;
+
+        await(sql`
+            UPDATE auth.users
+            SET
+                first_name='John updated',
+                last_name='Doe updated'
+            WHERE
+                id=1
+        `);
+
+        expect(
+            (await sql`
+                SELECT
+                    first_name,
+                    last_name
+                FROM
+                    auth.users
+                WHERE
+                    id=1
+            `)[0]
+        ).toMatchObject({
+            first_name: "John updated",
+            last_name: "Doe updated"
+        });
+
+        sql.end();
+    });
 });
 
 describe("When admin john-doe2 is connected", () => {

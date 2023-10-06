@@ -1448,6 +1448,18 @@ CREATE POLICY user_read
         )
     );
 
+CREATE POLICY user_write
+    ON auth.users
+    AS PERMISSIVE
+    FOR UPDATE
+    TO application_user
+    USING(
+        id = NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER
+    )
+    WITH CHECK (
+        id = NULLIF(CURRENT_SETTING('auth.user_id', TRUE), '')::INTEGER
+    );
+
 CREATE POLICY space_invitation_read
     ON auth.space_invitations
     AS PERMISSIVE
