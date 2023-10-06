@@ -23,14 +23,14 @@
 		"tests": "NODE_NO_WARNINGS=1 node --experimental-vm-modules node_modules/jest/bin/jest.js"
 	},
 	"devDependencies": {
-		"eslint": "8.49.0",
+		"eslint": "8.50.0",
 		"eslint-config-prettier": "9.0.0",
 		"eslint-config-standard": "17.1.0",
-		"eslint-plugin-jest": "27.4.0",
+		"eslint-plugin-jest": "27.4.2",
 		"eslint-plugin-n": "16.1.0",
 		"eslint-plugin-node": "11.1.0",
 		"eslint-plugin-promise": "6.1.1",
-		"eslint-plugin-svelte": "2.33.2",
+		"eslint-plugin-svelte": "2.34.0",
 		"eslint-plugin-unicorn": "48.0.1",
 		"jest": "29.7.0",
 		"prettier": "3.0.3",
@@ -39,17 +39,17 @@
 	"type": "module",
 	"dependencies": {
 		"@sveltejs/adapter-node": "1.3.1",
-		"@sveltejs/kit": "1.25.0",
+		"@sveltejs/kit": "1.25.1",
 		"graphile-migrate": "1.4.1",
 		"js-yaml": "4.1.0",
 		"jsonwebtoken": "9.0.2",
 		"nodemailer": "6.9.5",
-		"pino": "8.15.1",
+		"pino": "8.15.6",
 		"pino-caller": "3.4.0",
-		"pino-pretty": "10.2.0",
+		"pino-pretty": "10.2.3",
 		"postgres": "https://github.com/porsager/postgres/archive/b4c2526ba13e4f20f286b087887510e36c855f2f.tar.gz",
 		"svelte": "4.2.1",
-		"vite": "4.4.9",
+		"vite": "4.4.11",
 		"yargs": "17.7.2"
 	}
 }
