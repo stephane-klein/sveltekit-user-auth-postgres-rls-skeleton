@@ -150,7 +150,7 @@ describe("When john-doe2 user request the list of spaces", () => {
 });
 
 describe("When admin john-doe1 is connected", () => {
-    it("john-doe1 should be able update to read sessions informations", async() => {
+    it("john-doe1 should be able to read sessions informations", async() => {
         sql = postgres(
             "postgres://webapp:password@localhost:5433/myapp"
         );
