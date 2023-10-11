@@ -2,6 +2,9 @@ import sql from "$lib/server/db.js";
 
 export async function handle({ event, resolve }) {
     // See https://github.com/porsager/postgres/pull/667/files
+    // await sql.reserve() have a bug, it didn't execute auto fetching of array types
+    // then, I call this query to force auto fetching of array types loading
+    await sql`SELECT 1`;
     event.locals.sql = await sql.reserve();
 
     // Data transferred to the browser
